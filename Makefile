@@ -7,19 +7,20 @@ else
   LIB_FLAGS = -lopenblas -llapack -lmxnet
 endif
 
+SRC_DIR = src
+
 OPT = -O3
 DEBUGFLAGS = -rdynamic -g
 CXXFLAGS = $(OPT) -std=c++1y -MMD -Wall $(DEBUGFLAGS)
 
 all: main
 
-DEPS = 
-OBJ = utils.o logger.o mlp_gpu.o
+OBJ = utils.o logger.o thread_pool.o mlp_gpu.o
 
 -include *.d
 
-%.o: %.c $(DEPS)
-	$(CXX) $(CXXFLAGS) -c -o $@ $< $(LIB_FLAGS)
+%.o: $(SRC_DIR)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LIB_FLAGS)
 
 main: $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIB_FLAGS)
