@@ -11,7 +11,6 @@
 #include <map>
 #include <set>
 #include <iterator>
-#include <algorithm>
 #include <memory>
 
 #include <cmath>
@@ -19,17 +18,19 @@
 #include <cstdlib>
 #include <utility>
 
-#include <cinttypes>
 #include <limits>
-#include <type_traits>
 
 #include <chrono>
 #include <ctime>
 //#include <functional>
 
-#include <execinfo.h>
+#include <execinfo.h> // for stacktrace
 
 #include <boost/functional/hash.hpp>
+
+#include <boost/variant.hpp>
+#include <boost/variant/apply_visitor.hpp>
+#include <boost/variant/static_visitor.hpp>
 
 //#include <armadillo> // if <mlpack/core.hpp> is includeded, this line should be commented
 //#include <mlpack/core.hpp>
@@ -40,7 +41,9 @@
 
 using namespace mxnet::cpp;
 using std::size_t;
-using std::fstream;
+using std::ifstream;
+using std::ofstream;
+using std::istream;
 using std::ostream;
 using std::ostream_iterator;
 using std::cin;
@@ -135,5 +138,25 @@ ostream &operator<<(ostream &os, const vector<T> &val)
 
     return os;
 }
+
+/*
+ * types in the heterogeneous containers
+ */
+
+// boost::variant is adopted to construct heterogeneous containers.
+// In order to output variables without explicitly casting to a certain type, we don't use boost::any.
+using boost::variant;
+
+// Such types can be used as hyperparameters in the "consts" and "options".
+typedef variant<int, size_t,
+        double, float,
+        string, bool> hyperparameter_t;
+
+// Such types can be placed in the Logger::watching_var.
+// We use pointers because we want a reference to variables out of logger.
+typedef variant<const int *, const size_t *,
+        const double *, const float *,
+        const string *, const bool *> watching_var_t;
+
 
 #endif

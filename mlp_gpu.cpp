@@ -1,5 +1,6 @@
 #include "./common.h"
 #include "./utils.h"
+#include "./logger.h"
 
 const string data_root("/misc/projdata12/info_fil/zhwang/data/image/mnist/mnist_data/");
 const string model_root("./model/");
@@ -102,6 +103,8 @@ void get_batch_data(const unique_ptr<Executor> &exec, DataIter *iter)
 
 void run()
 {
+    Logger logger(cout, "result/", "mlp_gpu");
+
     auto duo = def_data_iter();
     auto train_iter = std::get<0>(duo);
     auto test_iter = std::get<1>(duo);
@@ -122,8 +125,15 @@ void run()
     unique_ptr<Optimizer> opt(OptimizerRegistry::Find("adadelta"));
     opt->SetParam("rescale_grad", 1.0 / batch_size);
 
+    size_t idx_epoch = existing_epoch + 1;
+    float acc = 0.0;
+    double time_cost = 0.0;
+    logger.add_var("idx_epoch", &idx_epoch)
+        .add_var("acc", &acc)
+        .add_var("time_cost", &time_cost);
+
     auto tic = system_clock::now();
-    for (size_t idx_epoch = existing_epoch + 1; idx_epoch <= max_epoch; ++idx_epoch)
+    for (; idx_epoch <= max_epoch; ++idx_epoch)
     {
         train_iter.Reset();
         for (size_t idx_batch = 0; train_iter.Next(); ++idx_batch)
@@ -140,21 +150,20 @@ void run()
             save_model(*exec, saving_model_path, {"x", "y"});
         }
 
-        Accuracy acc;
+        Accuracy acc_metric;
         test_iter.Reset();
         for (size_t idx_batch = 0; test_iter.Next(); ++idx_batch)
         {
             get_batch_data(exec, &test_iter);
             unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
             exec->Forward(false);
-            acc.Update(args["y"], exec->outputs[0]);
+            acc_metric.Update(args["y"], exec->outputs[0]);
         }
 
         auto toc = system_clock::now();
-        double time_cost = duration_cast<milliseconds>(toc - tic).count() / 1000.0;
-        cout << "epoch " << idx_epoch
-            << ", accuracy = " << acc.Get()
-            << ", elasped time = " << time_cost << endl;
+        time_cost = duration_cast<milliseconds>(toc - tic).count() / 1000.0;
+        acc = acc_metric.Get();
+        logger.log_watching_var();
     }
 }
 

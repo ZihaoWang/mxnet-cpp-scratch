@@ -14,7 +14,7 @@ CXXFLAGS = $(OPT) -std=c++1y -MMD -Wall $(DEBUGFLAGS)
 all: main
 
 DEPS = 
-OBJ = utils.o mlp_gpu_learn.o
+OBJ = utils.o logger.o mlp_gpu.o
 
 -include *.d
 
