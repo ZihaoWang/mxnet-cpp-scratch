@@ -104,7 +104,7 @@ void run(Logger &logger, HypContainer &hyp)
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
     if (boost::get<bool>(hyp["load_existing_model"]))
     {
-        const string existing_model_path(boost::get<string>(hyp["model_root"]) +
+        const string existing_model_path(PROJ_ROOT + "model/" +
                 boost::get<string>(hyp["model_prefix"]) +
                 "_epoch" + to_string(boost::get<int>(hyp["existing_epoch"])));
         cout << "load model: " << existing_model_path << endl;
@@ -136,9 +136,9 @@ void run(Logger &logger, HypContainer &hyp)
         }
         if (idx_epoch % boost::get<int>(hyp["save_freq"]) == 0)
         {
-            const string saving_model_path(boost::get<string>(hyp["model_root"]) +
+            const string saving_model_path(PROJ_ROOT + "model/" +
                     boost::get<string>(hyp["model_prefix"]) +
-                    "_epoch" + to_string(boost::get<int>(hyp["idx_epoch"])));
+                    "_epoch" + to_string(idx_epoch));
             cout << "save model: " << saving_model_path << endl;
             save_model(*exec, saving_model_path, {"x", "y"});
         }

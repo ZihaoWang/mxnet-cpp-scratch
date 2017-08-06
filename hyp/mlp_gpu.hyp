@@ -12,7 +12,6 @@ max_epoch 100
 save_freq 10
 [string]
 data_root /misc/projdata12/info_fil/zhwang/data/image/mnist/mnist_data/
-model_root ./model/
 model_prefix mlp
 
 // core model hyperparameters
