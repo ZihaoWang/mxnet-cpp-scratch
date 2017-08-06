@@ -20,6 +20,8 @@ unique_ptr<unordered_map<string, hyp_t>> load_hyp(const string &path)
         boost::trim(line);
         if (line.empty())
             continue;
+        if (line[0] == '/' && line[1] == '/') // the line of comment
+            continue;
 
         if (line[0] == '[') // parsing the line of type specification
         {
