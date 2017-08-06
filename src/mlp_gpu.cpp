@@ -2,22 +2,6 @@
 #include "utils.h"
 #include "logger.h"
 
-const string data_root("/misc/projdata12/info_fil/zhwang/data/image/mnist/mnist_data/");
-const string model_root("./model/");
-const string model_prefix("mlp");
-const size_t img_row = 28;
-const size_t img_col = 28;
-const size_t batch_size = 100;
-const size_t max_epoch = 100;
-const vector<size_t> dim_hidden = {128, 10};
-const float learning_rate = 1.0;
-const float weight_decay = 0.0;
-const size_t save_freq = 10;
-
-const bool load_existing_model = false;
-const size_t existing_epoch = 0;
-string existing_model_path(model_root + model_prefix + "_epoch" + to_string(existing_epoch));
-
 using namespace zh;
 
 auto def_core()
@@ -41,27 +25,31 @@ auto def_core()
     return output;
 }
 
-auto def_data_iter()
+auto def_data_iter(HypContainer &hyp)
 {
+    const string &data_root = boost::get<string>(hyp["data_root"]);
     auto train_iter = MXDataIter("MNISTIter")
         .SetParam("image", data_root + "train-images-idx3-ubyte")
         .SetParam("label", data_root + "train-labels-idx1-ubyte")
-        .SetParam("batch_size", batch_size)
+        .SetParam("batch_size", boost::get<int>(hyp["batch_size"]))
         .SetParam("flat", 1)
         .CreateDataIter();
     auto test_iter = MXDataIter("MNISTIter")
         .SetParam("image", data_root + "t10k-images-idx3-ubyte")
         .SetParam("label", data_root + "t10k-labels-idx1-ubyte")
-        .SetParam("batch_size", batch_size)
+        .SetParam("batch_size", boost::get<int>(hyp["batch_size"]))
         .SetParam("flat", 1)
         .CreateDataIter();
 
-    return make_tuple(train_iter, test_iter);
+    return make_pair(train_iter, test_iter);
 }
 
-void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx)
+void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, HypContainer &hyp)
 {
-    size_t dim_x = img_row * img_col;
+    const int dim_x = boost::get<int>(hyp["img_row"]) * boost::get<int>(hyp["img_col"]);
+    const int batch_size = boost::get<int>(hyp["batch_size"]);
+    const auto &dim_hidden = boost::get<vector<int>>(hyp["dim_hidden"]);
+
     args["x"] = NDArray(Shape(batch_size, dim_x), ctx);
     args["w1"] = NDArray(Shape(dim_x, dim_hidden[0]), ctx);
     args["b1"] = NDArray(Shape(dim_hidden[0]), ctx);
@@ -101,31 +89,32 @@ void get_batch_data(const unique_ptr<Executor> &exec, DataIter *iter)
     exec->arg_dict()["y"].WaitToRead();
 }
 
-void run()
+void run(Logger &logger, HypContainer &hyp)
 {
-    Logger logger(cout, "result/", "mlp_gpu");
-
-    auto duo = def_data_iter();
+    auto duo = def_data_iter(hyp);
     auto train_iter = std::get<0>(duo);
     auto test_iter = std::get<1>(duo);
 
     auto ctx = Context::gpu(0);
     map<string, NDArray> args, grads, aux_states;
     map<string, OpReqType> grad_types;
-    init_args(args, grads, grad_types, aux_states, ctx);
+    init_args(args, grads, grad_types, aux_states, ctx, hyp);
 
     auto core = def_core();
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
-    if (load_existing_model)
+    if (boost::get<bool>(hyp["load_existing_model"]))
     {
+        const string existing_model_path(boost::get<string>(hyp["model_root"]) +
+                boost::get<string>(hyp["model_prefix"]) +
+                "_epoch" + to_string(boost::get<int>(hyp["existing_epoch"])));
         cout << "load model: " << existing_model_path << endl;
         load_model(exec.get(), existing_model_path);
     }
 
     unique_ptr<Optimizer> opt(OptimizerRegistry::Find("adadelta"));
-    opt->SetParam("rescale_grad", 1.0 / batch_size);
+    opt->SetParam("rescale_grad", 1.0 / boost::get<int>(hyp["batch_size"]));
 
-    size_t idx_epoch = existing_epoch + 1;
+    int idx_epoch = boost::get<int>(hyp["existing_epoch"]) + 1;
     float acc = 0.0;
     double time_cost = 0.0;
     logger.add_var("idx_epoch", &idx_epoch)
@@ -133,7 +122,7 @@ void run()
         .add_var("time_cost", &time_cost);
 
     auto tic = system_clock::now();
-    for (; idx_epoch <= max_epoch; ++idx_epoch)
+    for (; idx_epoch <= boost::get<int>(hyp["max_epoch"]); ++idx_epoch)
     {
         train_iter.Reset();
         for (size_t idx_batch = 0; train_iter.Next(); ++idx_batch)
@@ -141,11 +130,15 @@ void run()
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
             exec->Backward();
-            exec->UpdateAll(opt.get(), learning_rate, weight_decay);
+            exec->UpdateAll(opt.get(),
+                    boost::get<float>(hyp["learning_rate"]),
+                    boost::get<float>(hyp["weight_decay"]));
         }
-        if (idx_epoch % save_freq == 0)
+        if (idx_epoch % boost::get<int>(hyp["save_freq"]) == 0)
         {
-            string saving_model_path(model_root + model_prefix + "_epoch" + to_string(idx_epoch));
+            const string saving_model_path(boost::get<string>(hyp["model_root"]) +
+                    boost::get<string>(hyp["model_prefix"]) +
+                    "_epoch" + to_string(boost::get<int>(hyp["idx_epoch"])));
             cout << "save model: " << saving_model_path << endl;
             save_model(*exec, saving_model_path, {"x", "y"});
         }
@@ -169,12 +162,12 @@ void run()
 
 int main(int argc, char** argv)
 {
-    Logger logger(cout, PROJ_ROOT + "result/", "mlp_gpu");
-    unique_ptr<unordered_map<string, hyp_t>> hyp = std::move(load_hyp(PROJ_ROOT + "hyperparameter.txt"));
-    //vector<int> dim_hidden = boost::get<vector<int>>(hyp->at("dim_hidden"));
-    logger.make_log("dim_hidden", hyp->at("dim_hidden"));
-    exit(0);
-    run();
+    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp_gpu");
+    auto hyp = load_hyp(PROJ_ROOT + "hyperparameter.txt");
+    logger->make_log("Hyperparameters:\n");
+    logger->make_log(*hyp);
+
+    run(*logger, *hyp);
     MXNotifyShutdown();
 
     return 0;

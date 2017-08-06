@@ -19,6 +19,6 @@ model_prefix mlp
 [int]
 batch_size 100
 dim_hidden 128 10
-[double]
+[float]
 learning_rate 1.0
 weight_decay 0.0

@@ -27,7 +27,7 @@
 
 #include <execinfo.h> // for stacktrace
 
-#include <boost/functional/hash.hpp>
+//#include <boost/functional/hash.hpp>
 
 #include <boost/variant.hpp>
 #include <boost/variant/apply_visitor.hpp>
@@ -116,7 +116,7 @@ template <typename T, typename ... Args>
 unique_ptr<T> make_unique(Args &&... args){ return unique_ptr<T>(new T(std::forward<Args>(args)...)); }
 
 /*
- * template overloading for printing containers
+ * functions for printing vectors
  */
 
 const size_t CONTAINER_MAX_PRINT_TIME = 100;
@@ -124,9 +124,18 @@ const size_t CONTAINER_MAX_PRINT_TIME = 100;
 template <typename T>
 ostream &operator<<(ostream &os, const vector<vector<T>> &val)
 {
-    for (size_t i = 0; i < val.size() - 1 && i < CONTAINER_MAX_PRINT_TIME; ++i)
-        os << val[i] << endl;
-    os << val.back();
+    if (val.size() <= CONTAINER_MAX_PRINT_TIME)
+    {
+        for (size_t i = 0; i < val.size() - 1; ++i)
+            os << val[i] << endl;
+        os << val.back();
+    }
+    else
+    {
+        for (size_t i = 0; i < CONTAINER_MAX_PRINT_TIME; ++i)
+            os << val[i] << endl;
+        os << "...";
+    }
 
     return os;
 }
@@ -134,31 +143,34 @@ ostream &operator<<(ostream &os, const vector<vector<T>> &val)
 template <typename T>
 ostream &operator<<(ostream &os, const vector<T> &val)
 {
-    for (size_t i = 0; i < val.size() - 1 && i < CONTAINER_MAX_PRINT_TIME; ++i)
-        os << val[i] << " ";
-    os << val.back();
+    if (val.size() <= CONTAINER_MAX_PRINT_TIME)
+    {
+        for (size_t i = 0; i < val.size() - 1; ++i)
+            os << val[i] << ", ";
+        os << val.back();
+    }
+    else
+    {
+        for (size_t i = 0; i < CONTAINER_MAX_PRINT_TIME; ++i)
+            os << val[i] << ", ";
+        os << "...";
+    }
 
     return os;
 }
 
-/*
- * types in the heterogeneous containers
- */
-
-// boost::variant and boost::any are adopted to construct heterogeneous containers.
+// boost::variant is adopted to construct heterogeneous containers.
 // In order to output variables without explicitly casting to a certain type, we don't use boost::any.
 using boost::variant;
 
-// Such types can be placed in the Logger::watching_var.
-// We use pointers because we want a reference to variables out of logger.
-typedef variant<const int *, const size_t *,
-        const double *, const float *,
-        const string *, const bool *> watching_var_t;
-
 // Such types can be used as hyperparameters.
 // Using Logger::make_log() to print and log these hyperparameters.
-typedef variant<int, double, string, bool,
-       vector<int>, vector<double>,
-       vector<string>> hyp_t;
+typedef variant<int, float, string, bool,
+       vector<int>, vector<float>,
+       vector<string>> HypVal;
+
+// container of hyperparameters
+typedef unordered_map<string, HypVal> HypContainer;
+
 
 #endif

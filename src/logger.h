@@ -6,11 +6,17 @@
 namespace zh
 {
 
+// Such types can be placed in the Logger::watching_var.
+// We use pointers because we want a reference to variables out of logger.
+typedef variant<const int *, const size_t *,
+        const double *, const float *,
+        const string *, const bool *> WatchingVar;
+
 struct WatchingVarPrinter : public boost::static_visitor<>
 {
     WatchingVarPrinter(ostream &os, ofstream &ofs): os(os), ofs(ofs) {}
 
-    // for watching_var_t
+    // for WatchingVar
     template <typename VAR_T>
     void operator()(const VAR_T &e) const
     {
@@ -58,15 +64,15 @@ class Logger
 
         ~Logger();
 
-        Logger &add_var(const string &name, const watching_var_t &var);
+        Logger &add_var(const string &name, const WatchingVar &var);
 
         Logger &del_var(const string &name);
 
         void make_log(const string &msg);
 
-        Logger &make_log(const string &name, const hyp_t &var);
+        Logger &make_log(const string &name, const HypVal &var);
 
-        void make_log(const unordered_map<string, hyp_t> &var);
+        void make_log(const HypContainer &var);
 
         void log_watching_var();
 
@@ -80,7 +86,7 @@ class Logger
         ofstream file;
         WatchingVarPrinter var_printer;
         HyperparameterPrinter hyp_printer;
-        vector<pair<string, watching_var_t>> watching_var;
+        vector<pair<string, WatchingVar>> watching_var;
 };
 
 } // namespace zh
