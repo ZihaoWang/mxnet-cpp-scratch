@@ -163,7 +163,7 @@ void run(Logger &logger, HypContainer &hyp)
 int main(int argc, char** argv)
 {
     auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp_gpu");
-    auto hyp = load_hyp(PROJ_ROOT + "hyperparameter.txt");
+    auto hyp = load_hyp(PROJ_ROOT + "hyp/mlp_gpu.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 
