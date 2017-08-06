@@ -64,9 +64,9 @@ class Logger
 
         void make_log(const string &msg);
 
-        Logger &make_log(const string &name, const hyperparameter_t &var);
+        Logger &make_log(const string &name, const hyp_t &var);
 
-        void make_log(const unordered_map<string, hyperparameter_t> &var);
+        void make_log(const unordered_map<string, hyp_t> &var);
 
         void log_watching_var();
 

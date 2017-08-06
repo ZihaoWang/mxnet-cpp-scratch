@@ -12,6 +12,7 @@
 #include <set>
 #include <iterator>
 #include <memory>
+#include <algorithm>
 
 #include <cmath>
 #include <random>
@@ -19,10 +20,10 @@
 #include <utility>
 
 #include <limits>
+#include <cctype>
 
 #include <chrono>
 #include <ctime>
-//#include <functional>
 
 #include <execinfo.h> // for stacktrace
 
@@ -62,22 +63,23 @@ using std::shared_ptr;
 using std::unique_ptr;
 using std::numeric_limits;
 using std::make_shared;
+using std::make_pair;
 using std::make_tuple;
 using std::tie;
 using std::to_string;
+using std::back_inserter;
 //using std::make_unique;
 using std::exit;
 using std::chrono::system_clock;
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
 
+const string PROJ_ROOT("/misc/projdata12/info_fil/zhwang/workspace/mxnet_learn/");
+
 inline void CRY(const string &msg)
 {
     cerr << "\nAn exception occurs!\n" << endl;
 
-    cerr << "in file: " << __FILE__ << endl;
-    cerr << "function: " << __func__ << endl;
-    cerr << "line: " << __LINE__ << endl;
     cerr << "with message: " << msg << "\n" << endl;
 
     const int MAX_STACKTRACE_SIZE = 10;
@@ -143,14 +145,9 @@ ostream &operator<<(ostream &os, const vector<T> &val)
  * types in the heterogeneous containers
  */
 
-// boost::variant is adopted to construct heterogeneous containers.
+// boost::variant and boost::any are adopted to construct heterogeneous containers.
 // In order to output variables without explicitly casting to a certain type, we don't use boost::any.
 using boost::variant;
-
-// Such types can be used as hyperparameters in the "consts" and "options".
-typedef variant<int, size_t,
-        double, float,
-        string, bool> hyperparameter_t;
 
 // Such types can be placed in the Logger::watching_var.
 // We use pointers because we want a reference to variables out of logger.
@@ -158,5 +155,10 @@ typedef variant<const int *, const size_t *,
         const double *, const float *,
         const string *, const bool *> watching_var_t;
 
+// Such types can be used as hyperparameters.
+// Using Logger::make_log() to print and log these hyperparameters.
+typedef variant<int, double, string, bool,
+       vector<int>, vector<double>,
+       vector<string>> hyp_t;
 
 #endif

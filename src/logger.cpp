@@ -54,7 +54,7 @@ void Logger::make_log(const string &msg)
     do_log(msg);
 }
 
-Logger &Logger::make_log(const string &name, const hyperparameter_t &var)
+Logger &Logger::make_log(const string &name, const hyp_t &var)
 {
     do_log(name).do_log(" = ");
     boost::apply_visitor(hyp_printer, var);
@@ -62,7 +62,7 @@ Logger &Logger::make_log(const string &name, const hyperparameter_t &var)
     return *this;
 }
 
-void Logger::make_log(const unordered_map<string, hyperparameter_t> &var)
+void Logger::make_log(const unordered_map<string, hyp_t> &var)
 {
     for (const auto &duo : var)
         make_log(duo.first, duo.second);
@@ -74,7 +74,7 @@ void Logger::log_watching_var()
     {
         do_log(duo.first).do_log(" = ");
         boost::apply_visitor(var_printer, duo.second);
-        do_log("\t");
+        do_log("    ");
     }
     flush_log();
 }

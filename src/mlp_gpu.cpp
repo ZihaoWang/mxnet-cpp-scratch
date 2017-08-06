@@ -1,6 +1,6 @@
-#include "./common.h"
-#include "./utils.h"
-#include "./logger.h"
+#include "common.h"
+#include "utils.h"
+#include "logger.h"
 
 const string data_root("/misc/projdata12/info_fil/zhwang/data/image/mnist/mnist_data/");
 const string model_root("./model/");
@@ -14,8 +14,8 @@ const float learning_rate = 1.0;
 const float weight_decay = 0.0;
 const size_t save_freq = 10;
 
-const bool load_existing_model = true;
-const size_t existing_epoch = 10;
+const bool load_existing_model = false;
+const size_t existing_epoch = 0;
 string existing_model_path(model_root + model_prefix + "_epoch" + to_string(existing_epoch));
 
 using namespace zh;
@@ -70,17 +70,17 @@ void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<stri
     args["y"] = NDArray(Shape(batch_size), ctx);
 
     grads["x"] = NDArray();
-    grads["w1_g"] = NDArray(Shape(dim_x, dim_hidden[0]), ctx);
-    grads["b1_g"] = NDArray(Shape(dim_hidden[0]), ctx);
-    grads["w2_g"] = NDArray(Shape(dim_hidden[0], dim_hidden[1]), ctx);
-    grads["b2_g"] = NDArray(Shape(dim_hidden[1]), ctx);
+    grads["w1"] = NDArray(Shape(dim_x, dim_hidden[0]), ctx);
+    grads["b1"] = NDArray(Shape(dim_hidden[0]), ctx);
+    grads["w2"] = NDArray(Shape(dim_hidden[0], dim_hidden[1]), ctx);
+    grads["b2"] = NDArray(Shape(dim_hidden[1]), ctx);
     grads["y"] = NDArray();
 
     grad_types["x"] = kNullOp;
-    grad_types["w1_g"] = kWriteTo;
-    grad_types["b1_g"] = kWriteTo;
-    grad_types["w2_g"] = kWriteTo;
-    grad_types["b2_g"] = kWriteTo;
+    grad_types["w1"] = kWriteTo;
+    grad_types["b1"] = kWriteTo;
+    grad_types["w2"] = kWriteTo;
+    grad_types["b2"] = kWriteTo;
     grad_types["y"] = kNullOp;
 
     auto init = Xavier();
@@ -169,6 +169,11 @@ void run()
 
 int main(int argc, char** argv)
 {
+    Logger logger(cout, PROJ_ROOT + "result/", "mlp_gpu");
+    unique_ptr<unordered_map<string, hyp_t>> hyp = std::move(load_hyp(PROJ_ROOT + "hyperparameter.txt"));
+    //vector<int> dim_hidden = boost::get<vector<int>>(hyp->at("dim_hidden"));
+    logger.make_log("dim_hidden", hyp->at("dim_hidden"));
+    exit(0);
     run();
     MXNotifyShutdown();
 

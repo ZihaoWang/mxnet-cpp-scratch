@@ -2,6 +2,7 @@
 #define ZIHAO_UTILS
 
 #include "./common.h"
+#include <boost/algorithm/string.hpp>
 
 namespace zh
 {
@@ -10,6 +11,11 @@ namespace zh
  * convenient mxnet wrappers
  */
 inline auto make_sym(const string &name){ return Symbol::Variable(name); }
+
+/*
+ * load hyperparameters from file
+ */
+unique_ptr<unordered_map<string, hyp_t>> load_hyp(const string &path);
 
 /*
  * save and load whole models

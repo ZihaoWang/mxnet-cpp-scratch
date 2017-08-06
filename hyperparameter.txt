@@ -1,0 +1,21 @@
+[bool]
+load_existing_model false
+[int]
+existing_epoch 0
+
+[string]
+data_root /misc/projdata12/info_fil/zhwang/data/image/mnist/mnist_data/
+model_root ./model/
+model_prefix mlp
+
+[int]
+img_row 28
+img_col 28
+batch_size 100
+max_epoch 100
+save_freq 10
+dim_hidden 128 10
+
+[double]
+learning_rate 1.0
+weight_decay 0.0
