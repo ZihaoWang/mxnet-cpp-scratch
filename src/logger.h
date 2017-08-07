@@ -2,6 +2,7 @@
 #define ZIHAO_LOGGER
 
 #include "./common.h"
+#include "hyp_container.h"
 
 namespace zh
 {
@@ -72,7 +73,7 @@ class Logger
 
         Logger &make_log(const string &name, const HypVal &var);
 
-        void make_log(const HypContainer &var);
+        void make_log(const HypContainer &hc);
 
         void log_watching_var();
 

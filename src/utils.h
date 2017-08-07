@@ -2,7 +2,6 @@
 #define ZIHAO_UTILS
 
 #include "./common.h"
-#include <boost/algorithm/string.hpp>
 
 namespace zh
 {
@@ -12,13 +11,6 @@ namespace zh
  */
 
 inline auto make_sym(const string &name){ return Symbol::Variable(name); }
-
-/*
- * load hyperparameters from file
- *
- * the format of contents in the file can be viewed in hyperparameter.txt
- */
-unique_ptr<HypContainer> load_hyp(const string &path);
 
 /*
  * save and load whole models

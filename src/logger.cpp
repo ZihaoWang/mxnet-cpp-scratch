@@ -62,9 +62,9 @@ Logger &Logger::make_log(const string &name, const HypVal &var)
     return *this;
 }
 
-void Logger::make_log(const HypContainer &var)
+void Logger::make_log(const HypContainer &hc)
 {
-    for (const auto &duo : var)
+    for (const auto &duo : hc.hyp)
         make_log(duo.first, duo.second);
 }
 

@@ -1,10 +1,11 @@
 #include "common.h"
+#include "hyp_container.h"
 #include "utils.h"
 #include "logger.h"
 
 using namespace zh;
 
-auto def_core()
+auto def_core(HypContainer &hyp)
 {
     auto s_x = make_sym("x");
     auto s_w1 = make_sym("w1");
@@ -27,17 +28,17 @@ auto def_core()
 
 auto def_data_iter(HypContainer &hyp)
 {
-    const string &data_root = boost::get<string>(hyp["data_root"]);
+    const string &data_root = hyp.sget("data_root");
     auto train_iter = MXDataIter("MNISTIter")
         .SetParam("image", data_root + "train-images-idx3-ubyte")
         .SetParam("label", data_root + "train-labels-idx1-ubyte")
-        .SetParam("batch_size", boost::get<int>(hyp["batch_size"]))
+        .SetParam("batch_size", hyp.iget("batch_size"))
         .SetParam("flat", 1)
         .CreateDataIter();
     auto test_iter = MXDataIter("MNISTIter")
         .SetParam("image", data_root + "t10k-images-idx3-ubyte")
         .SetParam("label", data_root + "t10k-labels-idx1-ubyte")
-        .SetParam("batch_size", boost::get<int>(hyp["batch_size"]))
+        .SetParam("batch_size", hyp.iget("batch_size"))
         .SetParam("flat", 1)
         .CreateDataIter();
 
@@ -46,9 +47,9 @@ auto def_data_iter(HypContainer &hyp)
 
 void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, HypContainer &hyp)
 {
-    const int dim_x = boost::get<int>(hyp["img_row"]) * boost::get<int>(hyp["img_col"]);
-    const int batch_size = boost::get<int>(hyp["batch_size"]);
-    const auto &dim_hidden = boost::get<vector<int>>(hyp["dim_hidden"]);
+    const int dim_x = hyp.iget("img_row") * hyp.iget("img_col");
+    const int batch_size = hyp.iget("batch_size");
+    const auto &dim_hidden = hyp.viget("dim_hidden");
 
     args["x"] = NDArray(Shape(batch_size, dim_x), ctx);
     args["w1"] = NDArray(Shape(dim_x, dim_hidden[0]), ctx);
@@ -100,21 +101,21 @@ void run(Logger &logger, HypContainer &hyp)
     map<string, OpReqType> grad_types;
     init_args(args, grads, grad_types, aux_states, ctx, hyp);
 
-    auto core = def_core();
+    auto core = def_core(hyp);
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
-    if (boost::get<bool>(hyp["load_existing_model"]))
+    if (hyp.bget("load_existing_model"))
     {
         const string existing_model_path(PROJ_ROOT + "model/" +
-                boost::get<string>(hyp["model_prefix"]) +
-                "_epoch" + to_string(boost::get<int>(hyp["existing_epoch"])));
+                hyp.sget("model_prefix") +
+                "_epoch" + to_string(hyp.iget("existing_epoch")));
         cout << "load model: " << existing_model_path << endl;
         load_model(exec.get(), existing_model_path);
     }
 
     unique_ptr<Optimizer> opt(OptimizerRegistry::Find("adadelta"));
-    opt->SetParam("rescale_grad", 1.0 / boost::get<int>(hyp["batch_size"]));
+    opt->SetParam("rescale_grad", 1.0 / hyp.iget("batch_size"));
 
-    int idx_epoch = boost::get<int>(hyp["existing_epoch"]) + 1;
+    int idx_epoch = hyp.iget("existing_epoch") + 1;
     float acc = 0.0;
     double time_cost = 0.0;
     logger.add_var("idx_epoch", &idx_epoch)
@@ -122,7 +123,7 @@ void run(Logger &logger, HypContainer &hyp)
         .add_var("time_cost", &time_cost);
 
     auto tic = system_clock::now();
-    for (; idx_epoch <= boost::get<int>(hyp["max_epoch"]); ++idx_epoch)
+    for (; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
     {
         train_iter.Reset();
         for (size_t idx_batch = 0; train_iter.Next(); ++idx_batch)
@@ -130,14 +131,12 @@ void run(Logger &logger, HypContainer &hyp)
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
             exec->Backward();
-            exec->UpdateAll(opt.get(),
-                    boost::get<float>(hyp["learning_rate"]),
-                    boost::get<float>(hyp["weight_decay"]));
+            exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
         }
-        if (idx_epoch % boost::get<int>(hyp["save_freq"]) == 0)
+        if (idx_epoch % hyp.iget("save_freq") == 0)
         {
             const string saving_model_path(PROJ_ROOT + "model/" +
-                    boost::get<string>(hyp["model_prefix"]) +
+                    hyp.sget("model_prefix") +
                     "_epoch" + to_string(idx_epoch));
             cout << "save model: " << saving_model_path << endl;
             save_model(*exec, saving_model_path, {"x", "y"});
@@ -163,7 +162,7 @@ void run(Logger &logger, HypContainer &hyp)
 int main(int argc, char** argv)
 {
     auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp_gpu");
-    auto hyp = load_hyp(PROJ_ROOT + "hyp/mlp_gpu.hyp");
+    auto hyp = make_unique<HypContainer>(PROJ_ROOT + "hyp/mlp_gpu.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 

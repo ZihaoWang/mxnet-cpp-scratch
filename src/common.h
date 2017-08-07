@@ -163,14 +163,4 @@ ostream &operator<<(ostream &os, const vector<T> &val)
 // In order to output variables without explicitly casting to a certain type, we don't use boost::any.
 using boost::variant;
 
-// Such types can be used as hyperparameters.
-// Using Logger::make_log() to print and log these hyperparameters.
-typedef variant<int, float, string, bool,
-       vector<int>, vector<float>,
-       vector<string>> HypVal;
-
-// container of hyperparameters
-typedef unordered_map<string, HypVal> HypContainer;
-
-
 #endif
