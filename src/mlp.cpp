@@ -96,7 +96,8 @@ void run(Logger &logger, HypContainer &hyp)
     auto train_iter = std::get<0>(duo);
     auto test_iter = std::get<1>(duo);
 
-    auto ctx = Context::gpu(0);
+    auto ctx = hyp.bget("using_gpu") ? Context::gpu(hyp.iget("idx_gpu")) : Context::cpu();
+
     map<string, NDArray> args, grads, aux_states;
     map<string, OpReqType> grad_types;
     init_args(args, grads, grad_types, aux_states, ctx, hyp);
@@ -161,8 +162,8 @@ void run(Logger &logger, HypContainer &hyp)
 
 int main(int argc, char** argv)
 {
-    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp_gpu");
-    auto hyp = make_unique<HypContainer>(PROJ_ROOT + "hyp/mlp_gpu.hyp");
+    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp");
+    auto hyp = make_unique<HypContainer>(PROJ_ROOT + "hyp/mlp.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 

@@ -1,10 +1,16 @@
+// device
+[bool]
+using_gpu true
+[int]
+idx_gpu 0
+
 // loading model related hyperparameters
 [bool]
 load_existing_model false
 [int]
 existing_epoch 0
 
-// data and running related hyperparameters
+// data and framework related hyperparameters
 [int]
 img_row 28
 img_col 28

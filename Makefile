@@ -15,7 +15,7 @@ CXXFLAGS = $(OPT) -std=c++1y -MMD -Wall $(DEBUGFLAGS)
 
 all: main
 
-OBJ = utils.o hyp_container.o logger.o thread_pool.o mlp_gpu.o
+OBJ = utils.o hyp_container.o logger.o thread_pool.o mlp.o
 
 -include *.d
 

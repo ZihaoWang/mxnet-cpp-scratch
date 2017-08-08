@@ -1,0 +1,29 @@
+// device
+[bool]
+using_gpu true
+[int]
+idx_gpu 0
+
+// loading model related hyperparameters
+[bool]
+load_existing_model false
+[int]
+existing_epoch 0
+
+// data and framework related hyperparameters
+[int]
+img_row 28
+img_col 28
+max_epoch 100
+save_freq 10
+[string]
+data_root /misc/projdata12/info_fil/zhwang/data/image/mnist/mnist_data/
+model_prefix lenet
+
+// core model hyperparameters
+[int]
+batch_size 100
+dim_hidden 128 10
+[float]
+learning_rate 1.0
+weight_decay 0.0
