@@ -8,16 +8,20 @@ else
 endif
 
 SRC_DIR = src
+AUX_DIR = $(SRC_DIR)/aux
 
 OPT = -O3
 DEBUGFLAGS = -rdynamic -g
-CXXFLAGS = $(OPT) -std=c++1y -MMD -Wall $(DEBUGFLAGS)
+CXXFLAGS = $(OPT) -std=c++1y -MMD -Wall $(DEBUGFLAGS) -I$(AUX_DIR)
 
 all: main
 
-OBJ = utils.o hyp_container.o logger.o thread_pool.o mlp.o
+OBJ = utils.o hyp_container.o logger.o thread_pool.o lenet.o
 
 -include *.d
+
+%.o: $(AUX_DIR)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LIB_FLAGS)
 
 %.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LIB_FLAGS)
