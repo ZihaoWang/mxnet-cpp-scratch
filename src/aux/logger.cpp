@@ -52,6 +52,7 @@ Logger &Logger::del_var(const string &name)
 void Logger::make_log(const string &msg)
 {
     do_log(msg);
+    flush_log();
 }
 
 Logger &Logger::make_log(const string &name, const HypVal &var)
@@ -66,6 +67,7 @@ void Logger::make_log(const HypContainer &hc)
 {
     for (const auto &duo : hc.hyp)
         make_log(duo.first, duo.second);
+    flush_log();
 }
 
 void Logger::log_watching_var()

@@ -95,6 +95,7 @@ void run(Logger &logger, HypContainer &hyp)
     auto duo = def_data_iter(hyp);
     auto train_iter = std::get<0>(duo);
     auto test_iter = std::get<1>(duo);
+
     auto ctx = hyp.bget("using_gpu") ? Context::gpu(hyp.iget("idx_gpu")) : Context::cpu();
 
     map<string, NDArray> args, grads, aux_states;
@@ -108,7 +109,7 @@ void run(Logger &logger, HypContainer &hyp)
         const string existing_model_path(PROJ_ROOT + "model/" +
                 hyp.sget("model_prefix") +
                 "_epoch" + to_string(hyp.iget("existing_epoch")));
-        cout << "load model: " << existing_model_path << endl;
+        logger.make_log("load model: " + existing_model_path);
         load_model(exec.get(), existing_model_path);
     }
 
@@ -138,7 +139,7 @@ void run(Logger &logger, HypContainer &hyp)
             const string saving_model_path(PROJ_ROOT + "model/" +
                     hyp.sget("model_prefix") +
                     "_epoch" + to_string(idx_epoch));
-            cout << "save model: " << saving_model_path << endl;
+            logger.make_log("save model: " + saving_model_path);
             save_model(*exec, saving_model_path, {"x", "y"});
         }
 
@@ -161,8 +162,8 @@ void run(Logger &logger, HypContainer &hyp)
 
 int main(int argc, char** argv)
 {
-    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "lenet");
-    auto hyp = make_unique<HypContainer>(PROJ_ROOT + "hyp/lenet.hyp");
+    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp");
+    auto hyp = make_unique<HypContainer>(PROJ_ROOT + "hyp/mlp.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 
