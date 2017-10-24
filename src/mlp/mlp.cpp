@@ -5,6 +5,8 @@
 
 using namespace zh;
 
+const string MLP_ROOT(PROJ_ROOT + "src/mlp/");
+
 auto def_core(HypContainer &hyp)
 {
     auto s_x = make_sym("x");
@@ -84,10 +86,11 @@ void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<stri
 void get_batch_data(const unique_ptr<Executor> &exec, DataIter *iter)
 {
     const auto batch = iter->GetDataBatch();
-    exec->arg_dict()["x"].SyncCopyFromCPU(batch.data.GetData(), batch.data.Size());
-    exec->arg_dict()["x"].WaitToRead();
-    exec->arg_dict()["y"].SyncCopyFromCPU(batch.label.GetData(), batch.label.Size());
-    exec->arg_dict()["y"].WaitToRead();
+    auto arg_dict = exec->arg_dict();
+    arg_dict["x"].SyncCopyFromCPU(batch.data.GetData(), batch.data.Size());
+    arg_dict["x"].WaitToRead();
+    arg_dict["y"].SyncCopyFromCPU(batch.label.GetData(), batch.label.Size());
+    arg_dict["y"].WaitToRead();
 }
 
 void run(Logger &logger, HypContainer &hyp)
@@ -163,7 +166,7 @@ void run(Logger &logger, HypContainer &hyp)
 int main(int argc, char** argv)
 {
     auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp");
-    auto hyp = make_unique<HypContainer>(PROJ_ROOT + "hyp/mlp.hyp");
+    auto hyp = make_unique<HypContainer>(MLP_ROOT + "mlp.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 

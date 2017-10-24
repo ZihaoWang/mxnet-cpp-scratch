@@ -8,39 +8,55 @@ const string LENET_ROOT(PROJ_ROOT + "src/lenet/");
 
 auto def_core(HypContainer &hyp)
 {
-    auto s_x = make_sym("x");
-    auto s_w1 = make_sym("w1");
-    auto s_b1 = make_sym("b1");
-    auto s_w2 = make_sym("w2");
-    auto s_b2 = make_sym("b2");
-    auto s_y = make_sym("y");
+    const auto &dim_conv_rker = hyp.viget("dim_conv_rker");
+    const auto &dim_conv_cker = hyp.viget("dim_conv_cker");
+    const auto &num_filter = hyp.viget("num_filter");
+    const auto &dim_pool_rker = hyp.viget("dim_pool_rker");
+    const auto &dim_pool_cker = hyp.viget("dim_pool_cker");
+    const auto &dim_pool_rstrd = hyp.viget("dim_pool_rstrd");
+    const auto &dim_pool_cstrd = hyp.viget("dim_pool_cstrd");
 
-    auto s_h1 = sigmoid(broadcast_add(dot(s_x, s_w1), s_b1));
-    auto s_h2 = sigmoid(broadcast_add(dot(s_h1, s_w2), s_b2));
+    auto x = make_sym("x");
+    vector<Symbol> w_convs = {make_sym("w_conv1"), make_sym("w_conv2"), make_sym("w_conv3")};
+    vector<Symbol> b_convs = {make_sym("b_conv1"), make_sym("b_conv2"), make_sym("b_conv3")};
+    auto y = make_sym("y");
+
+    vector<Symbol> layers;
+    const Symbol *last = &x;
+    for (size_t i = 0; i < dim_conv_rker.size(); ++i)
+    {
+        layers.push_back(Convolution(*last, w_convs[i], b_convs[i], Shape(dim_conv_rker[i], dim_conv_cker[i]), num_filter[i])); 
+        layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
+        layers.push_back(Pooling(layers.back(), Shape(dim_pool_rker[i], dim_pool_cker[i]), PoolingPoolType::kMax, false, false, PoolingPoolingConvention::kValid, Shape(dim_pool_rstrd[i], dim_pool_cstrd[i])));
+        last = &layers.back();
+    }
+
+    auto output = broadcast_mul(*last, sum(y));
+    //auto output = SoftmaxOutput(h2, y);
+    return output;
+
     /*
     vector<vector<string>> tmp;
-    tmp.push_back(s_h1.ListArguments());
-    tmp.push_back(s_h1.ListArguments());
+    tmp.push_back(h1.ListArguments());
+    tmp.push_back(h1.ListArguments());
     cout << tmp << endl;
     */
-    auto output = SoftmaxOutput(s_h2, s_y);
-    return output;
 }
 
 auto def_data_iter(HypContainer &hyp)
 {
     const string &data_root = hyp.sget("data_root");
-    auto train_iter = MXDataIter("NNISTIter")
+    auto train_iter = MXDataIter("MNISTIter")
         .SetParam("image", data_root + "train-images-idx3-ubyte")
         .SetParam("label", data_root + "train-labels-idx1-ubyte")
         .SetParam("batch_size", hyp.iget("batch_size"))
-        .SetParam("flat", 1)
+        .SetParam("flat", 0)
         .CreateDataIter();
     auto test_iter = MXDataIter("MNISTIter")
         .SetParam("image", data_root + "t10k-images-idx3-ubyte")
         .SetParam("label", data_root + "t10k-labels-idx1-ubyte")
         .SetParam("batch_size", hyp.iget("batch_size"))
-        .SetParam("flat", 1)
+        .SetParam("flat", 0)
         .CreateDataIter();
 
     return make_pair(train_iter, test_iter);
@@ -48,30 +64,36 @@ auto def_data_iter(HypContainer &hyp)
 
 void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, HypContainer &hyp)
 {
-    const int dim_x = hyp.iget("img_row") * hyp.iget("img_col");
     const int batch_size = hyp.iget("batch_size");
-    const auto &dim_hidden = hyp.viget("dim_hidden");
+    const auto &num_filter = hyp.viget("num_filter");
+    const auto &dim_conv_rker = hyp.viget("dim_conv_rker");
+    const auto &dim_conv_cker = hyp.viget("dim_conv_cker");
 
-    args["x"] = NDArray(Shape(batch_size, dim_x), ctx);
-    args["w1"] = NDArray(Shape(dim_x, dim_hidden[0]), ctx);
-    args["b1"] = NDArray(Shape(dim_hidden[0]), ctx);
-    args["w2"] = NDArray(Shape(dim_hidden[0], dim_hidden[1]), ctx);
-    args["b2"] = NDArray(Shape(dim_hidden[1]), ctx);
-    args["y"] = NDArray(Shape(batch_size), ctx);
+    const vector<pair<string, Shape>> io_shapes = {
+        {"x", Shape(batch_size, hyp.iget("num_channel"), hyp.iget("img_row"), hyp.iget("img_col"))},
+        {"y", Shape(batch_size)}
+    };
+    for (auto &duo : io_shapes)
+    {
+        args.insert({duo.first, NDArray(duo.second, ctx)});
+        grads.insert({duo.first, NDArray()});
+        grad_types.insert({duo.first, kNullOp});
+    }
 
-    grads["x"] = NDArray();
-    grads["w1"] = NDArray(Shape(dim_x, dim_hidden[0]), ctx);
-    grads["b1"] = NDArray(Shape(dim_hidden[0]), ctx);
-    grads["w2"] = NDArray(Shape(dim_hidden[0], dim_hidden[1]), ctx);
-    grads["b2"] = NDArray(Shape(dim_hidden[1]), ctx);
-    grads["y"] = NDArray();
-
-    grad_types["x"] = kNullOp;
-    grad_types["w1"] = kWriteTo;
-    grad_types["b1"] = kWriteTo;
-    grad_types["w2"] = kWriteTo;
-    grad_types["b2"] = kWriteTo;
-    grad_types["y"] = kNullOp;
+    const vector<pair<string, Shape>> arg_shapes = {
+        {"w_conv1", Shape(num_filter[0], hyp.iget("num_channel"), dim_conv_rker[0], dim_conv_cker[0])},
+        {"b_conv1", Shape(num_filter[0])},
+        {"w_conv2", Shape(num_filter[1], num_filter[0], dim_conv_rker[1], dim_conv_cker[1])},
+        {"b_conv2", Shape(num_filter[1])},
+        {"w_conv3", Shape(num_filter[2], num_filter[1], dim_conv_rker[2], dim_conv_cker[2])},
+        {"b_conv3", Shape(num_filter[2])}
+    };
+    for (auto &duo : arg_shapes)
+    {
+        args.insert({duo.first, NDArray(duo.second, ctx)});
+        grads.insert({duo.first, NDArray(duo.second, ctx)});
+        grad_types.insert({duo.first, kWriteTo});
+    }
 
     auto init = Xavier();
     for (auto &duo : args)
@@ -85,10 +107,12 @@ void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<stri
 void get_batch_data(const unique_ptr<Executor> &exec, DataIter *iter)
 {
     const auto batch = iter->GetDataBatch();
-    exec->arg_dict()["x"].SyncCopyFromCPU(batch.data.GetData(), batch.data.Size());
-    exec->arg_dict()["x"].WaitToRead();
-    exec->arg_dict()["y"].SyncCopyFromCPU(batch.label.GetData(), batch.label.Size());
-    exec->arg_dict()["y"].WaitToRead();
+    auto arg_dict = exec->arg_dict();
+
+    arg_dict["x"].SyncCopyFromCPU(batch.data.Reshape(Shape(0, 1, 0, 0)).GetData(), batch.data.Size());
+    arg_dict["x"].WaitToRead();
+    arg_dict["y"].SyncCopyFromCPU(batch.label.GetData(), batch.label.Size());
+    arg_dict["y"].WaitToRead();
 }
 
 void run(Logger &logger, HypContainer &hyp)
@@ -131,6 +155,9 @@ void run(Logger &logger, HypContainer &hyp)
         {
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
+            for (auto e : exec->outputs)
+                cout << e.GetShape() << endl;
+            return;
             exec->Backward();
             exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
         }

@@ -23,7 +23,14 @@ model_prefix lenet
 // core model hyperparameters
 [int]
 batch_size 100
-dim_hidden 128 10
+num_channel 1
+dim_conv_rker 5 5 2
+dim_conv_cker 5 5 2
+num_filter 20 50 500
+dim_pool_rker 2 2 2
+dim_pool_cker 2 2 2
+dim_pool_rstrd 2 2 1
+dim_pool_cstrd 2 2 1
 [float]
 learning_rate 1.0
 weight_decay 0.0
