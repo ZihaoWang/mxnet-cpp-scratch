@@ -5,9 +5,8 @@ namespace zh
 
 Logger::Logger(ostream &os, const string &log_dir, const string &log_prefix):
     console(os),
-    file(),
-    var_printer(console, file),
-    hyp_printer(console, file)
+    var_printer(console, file.get()),
+    hyp_printer(console, file.get())
 {
     time_t tt = system_clock::to_time_t(system_clock::now());
     string cur_time(ctime(&tt));
@@ -19,17 +18,21 @@ Logger::Logger(ostream &os, const string &log_dir, const string &log_prefix):
 
     string log_path(log_dir + log_prefix + "::" + cur_time + ".log");
 
-    file.open(log_path);
-    if (!file)
-        CRY("log file can't be created: " + log_path);
-
-    console << "Logger has been initlized, the log file is at: " << log_path << endl;
-    file << "Logger has been initlized, the log file is at: " << log_path << endl;
+    if (log_dir.empty())
+        make_log("Logger has been initlized, and the log file is not used");
+    else
+    {
+        file = make_unique<ofstream>();
+        file->open(log_path);
+        if (!*file)
+            CRY("log file can't be created: " + log_path);
+        make_log("Logger has been initlized, and the log file is at: " + log_path);
+    }
 }
 
 Logger::~Logger()
 {
-    file.close();
+    file->close();
 }
 
 Logger &Logger::add_var(const string &name, const WatchingVar &var)
@@ -85,14 +88,16 @@ template <typename VAR_T>
 Logger &Logger::do_log(const VAR_T &val)
 {
     console << val;
-    file << val;
+    if (file)
+        *file << val;
     return *this;
 }
 
 void Logger::flush_log()
 {
     console << endl;
-    file << endl;
+    if (file)
+        *file << endl;
 }
 
 } // namespace zh

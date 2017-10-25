@@ -16,31 +16,31 @@ typedef variant<int, float, string, bool,
 // convient wrappers
 struct HypContainer
 {
-        /*
-         * load hyperparameters from file
-         *
-         * the format of contents in the file can be viewed from *.hyp under hyp/
-         */
-        HypContainer(const string &hyp_path);
+    /*
+     * load hyperparameters from file
+     *
+     * the format of contents in the file can be viewed from *.hyp under hyp/
+     */
+    HypContainer(const string &hyp_path);
 
-        /*
-         * convenient wrappers for boost::get<T>()
-         */
-        int &iget(const string &name);
+    /*
+     * convenient wrappers for boost::get<T>()
+     */
+    int &iget(const string &name);
 
-        float &fget(const string &name);
+    float &fget(const string &name);
 
-        string &sget(const string &name);
+    string &sget(const string &name);
 
-        bool &bget(const string &name);
+    bool &bget(const string &name);
 
-        vector<int> &viget(const string &name);
+    vector<int> &viget(const string &name);
 
-        vector<float> &vfget(const string &name);
+    vector<float> &vfget(const string &name);
 
-        vector<string> &vsget(const string &name);
+    vector<string> &vsget(const string &name);
 
-        unordered_map<string, HypVal> hyp;
+    unordered_map<string, HypVal> hyp;
 };
 
 

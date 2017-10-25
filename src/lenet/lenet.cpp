@@ -6,8 +6,9 @@
 using namespace zh;
 const string LENET_ROOT(PROJ_ROOT + "src/lenet/");
 
-auto def_core(HypContainer &hyp)
+auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>> &arg_shapes, HypContainer &hyp)
 {
+    const unsigned int &batch_size = hyp.iget("batch_size");
     const auto &dim_conv_rker = hyp.viget("dim_conv_rker");
     const auto &dim_conv_cker = hyp.viget("dim_conv_cker");
     const auto &num_filter = hyp.viget("num_filter");
@@ -15,25 +16,47 @@ auto def_core(HypContainer &hyp)
     const auto &dim_pool_cker = hyp.viget("dim_pool_cker");
     const auto &dim_pool_rstrd = hyp.viget("dim_pool_rstrd");
     const auto &dim_pool_cstrd = hyp.viget("dim_pool_cstrd");
-
-    auto x = make_sym("x");
-    vector<Symbol> w_convs = {make_sym("w_conv1"), make_sym("w_conv2"), make_sym("w_conv3")};
-    vector<Symbol> b_convs = {make_sym("b_conv1"), make_sym("b_conv2"), make_sym("b_conv3")};
-    auto y = make_sym("y");
+    const auto &dim_fc = hyp.viget("dim_fc");
 
     vector<Symbol> layers;
-    const Symbol *last = &x;
+
+    const string input_name("x");
+    map<string, vector<mx_uint>> infer_input = {
+        {input_name, {batch_size, static_cast<mx_uint>(hyp.iget("num_channel")), static_cast<mx_uint>(hyp.iget("img_row")), static_cast<mx_uint>(hyp.iget("img_col"))}}
+    };
+    layers.push_back(make_sym(input_name));
+    io_shapes.push_back({input_name, Shape(batch_size, hyp.iget("num_channel"), hyp.iget("img_row"), hyp.iget("img_col"))});
+
     for (size_t i = 0; i < dim_conv_rker.size(); ++i)
     {
-        layers.push_back(Convolution(*last, w_convs[i], b_convs[i], Shape(dim_conv_rker[i], dim_conv_cker[i]), num_filter[i])); 
+        const string w_name("w_conv" + to_string(i + 1));
+        const string b_name("b_conv" + to_string(i + 1));
+        const int num_filter_last = i == 0 ? hyp.iget("num_channel") : num_filter[i - 1];
+
+        layers.push_back(Convolution(layers.back(), make_sym(w_name), make_sym(b_name), Shape(dim_conv_rker[i], dim_conv_cker[i]), num_filter[i])); 
+        arg_shapes.push_back({w_name, Shape(num_filter[i], num_filter_last, dim_conv_rker[i], dim_conv_cker[i])});
+        arg_shapes.push_back({b_name, Shape(num_filter[i])});
+
         layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
         layers.push_back(Pooling(layers.back(), Shape(dim_pool_rker[i], dim_pool_cker[i]), PoolingPoolType::kMax, false, false, PoolingPoolingConvention::kValid, Shape(dim_pool_rstrd[i], dim_pool_cstrd[i])));
-        last = &layers.back();
     }
 
-    auto output = broadcast_mul(*last, sum(y));
-    //auto output = SoftmaxOutput(h2, y);
-    return output;
+    layers.push_back(Flatten(layers.back()));
+    vector<vector<mx_uint>> in_shapes, aux_shapes, out_shapes;
+    layers.back().InferShape(infer_input, &in_shapes, &aux_shapes, &out_shapes);
+    int dim_flatten = out_shapes[0][1];
+
+    layers.push_back(FullyConnected(layers.back(), make_sym("w_fc1"), make_sym("b_fc1"), dim_fc[0]));
+    arg_shapes.push_back({"w_fc1", Shape(dim_fc[0], dim_flatten)});
+    arg_shapes.push_back({"b_fc1", Shape(dim_fc[0])});
+    layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
+    layers.push_back(FullyConnected(layers.back(), make_sym("w_fc2"), make_sym("b_fc2"), dim_fc[1]));
+    arg_shapes.push_back({"w_fc2", Shape(dim_fc[1], dim_fc[0])});
+    arg_shapes.push_back({"b_fc2", Shape(dim_fc[1])});
+
+    layers.push_back(SoftmaxOutput(layers.back(), make_sym("y")));
+    io_shapes.push_back({"y", Shape(batch_size)});
+    return layers.back();
 
     /*
     vector<vector<string>> tmp;
@@ -62,17 +85,8 @@ auto def_data_iter(HypContainer &hyp)
     return make_pair(train_iter, test_iter);
 }
 
-void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, HypContainer &hyp)
+void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>> &arg_shapes, HypContainer &hyp)
 {
-    const int batch_size = hyp.iget("batch_size");
-    const auto &num_filter = hyp.viget("num_filter");
-    const auto &dim_conv_rker = hyp.viget("dim_conv_rker");
-    const auto &dim_conv_cker = hyp.viget("dim_conv_cker");
-
-    const vector<pair<string, Shape>> io_shapes = {
-        {"x", Shape(batch_size, hyp.iget("num_channel"), hyp.iget("img_row"), hyp.iget("img_col"))},
-        {"y", Shape(batch_size)}
-    };
     for (auto &duo : io_shapes)
     {
         args.insert({duo.first, NDArray(duo.second, ctx)});
@@ -80,14 +94,6 @@ void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<stri
         grad_types.insert({duo.first, kNullOp});
     }
 
-    const vector<pair<string, Shape>> arg_shapes = {
-        {"w_conv1", Shape(num_filter[0], hyp.iget("num_channel"), dim_conv_rker[0], dim_conv_cker[0])},
-        {"b_conv1", Shape(num_filter[0])},
-        {"w_conv2", Shape(num_filter[1], num_filter[0], dim_conv_rker[1], dim_conv_cker[1])},
-        {"b_conv2", Shape(num_filter[1])},
-        {"w_conv3", Shape(num_filter[2], num_filter[1], dim_conv_rker[2], dim_conv_cker[2])},
-        {"b_conv3", Shape(num_filter[2])}
-    };
     for (auto &duo : arg_shapes)
     {
         args.insert({duo.first, NDArray(duo.second, ctx)});
@@ -122,11 +128,14 @@ void run(Logger &logger, HypContainer &hyp)
     auto test_iter = std::get<1>(duo);
     auto ctx = hyp.bget("using_gpu") ? Context::gpu(hyp.iget("idx_gpu")) : Context::cpu();
 
+    vector<pair<string, Shape>> io_shapes;
+    vector<pair<string, Shape>> arg_shapes;
+    auto core = def_core(io_shapes, arg_shapes, hyp);
+
     map<string, NDArray> args, grads, aux_states;
     map<string, OpReqType> grad_types;
-    init_args(args, grads, grad_types, aux_states, ctx, hyp);
+    init_args(args, grads, grad_types, aux_states, ctx, io_shapes, arg_shapes, hyp);
 
-    auto core = def_core(hyp);
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
     if (hyp.bget("load_existing_model"))
     {
@@ -141,26 +150,30 @@ void run(Logger &logger, HypContainer &hyp)
     opt->SetParam("rescale_grad", 1.0 / hyp.iget("batch_size"));
 
     int idx_epoch = hyp.iget("existing_epoch") + 1;
+    float train_loss = 0.0;
     float acc = 0.0;
     double time_cost = 0.0;
     logger.add_var("idx_epoch", &idx_epoch)
+        .add_var("train_loss", &train_loss)
         .add_var("acc", &acc)
         .add_var("time_cost", &time_cost);
 
+    auto ce_loss = make_unique<LogLoss>();
     auto tic = system_clock::now();
     for (; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
     {
         train_iter.Reset();
+        ce_loss->Reset();
         for (size_t idx_batch = 0; train_iter.Next(); ++idx_batch)
         {
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
-            for (auto e : exec->outputs)
-                cout << e.GetShape() << endl;
-            return;
             exec->Backward();
             exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
+            ce_loss->Update(args["y"], exec->outputs[0]);
         }
+        train_loss = ce_loss->Get();
+
         if (idx_epoch % hyp.iget("save_freq") == 0)
         {
             const string saving_model_path(PROJ_ROOT + "model/" +
@@ -189,6 +202,7 @@ void run(Logger &logger, HypContainer &hyp)
 
 int main(int argc, char** argv)
 {
+    //auto logger = make_unique<Logger>(cout, "", "lenet");
     auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "lenet");
     auto hyp = make_unique<HypContainer>(LENET_ROOT + "lenet.hyp");
     logger->make_log("Hyperparameters:\n");

@@ -15,35 +15,37 @@ typedef variant<const int *, const size_t *,
 
 struct WatchingVarPrinter : public boost::static_visitor<>
 {
-    WatchingVarPrinter(ostream &os, ofstream &ofs): os(os), ofs(ofs) {}
+    WatchingVarPrinter(ostream &os, ofstream *ofs): os(os), ofs(ofs) {}
 
     // for WatchingVar
     template <typename VAR_T>
     void operator()(const VAR_T &e) const
     {
         os << *e;
-        ofs << *e;
+        if (ofs)
+            *ofs << *e;
     }
 
     private:
         ostream &os;
-        ofstream &ofs;
+        ofstream *ofs;
 };
 
 struct HyperparameterPrinter : public boost::static_visitor<>
 {
-    HyperparameterPrinter(ostream &os, ofstream &ofs): os(os), ofs(ofs) {}
+    HyperparameterPrinter(ostream &os, ofstream *ofs): os(os), ofs(ofs) {}
 
     template <typename VAR_T>
     void operator()(const VAR_T &e) const
     {
         os << e;
-        ofs << e;
+        if (ofs)
+            *ofs << e;
     }
 
     private:
         ostream &os;
-        ofstream &ofs;
+        ofstream *ofs;
 };
 
 // size_t epoch = 1;
@@ -61,6 +63,7 @@ struct HyperparameterPrinter : public boost::static_visitor<>
 class Logger
 {
     public:
+        // if log_dir == "", Logger will not log to the file and just print to the console
         Logger(ostream &os, const string &log_dir, const string &log_prefix);
 
         ~Logger();
@@ -84,7 +87,7 @@ class Logger
         void flush_log();
 
         ostream &console;
-        ofstream file;
+        unique_ptr<ofstream> file;
         WatchingVarPrinter var_printer;
         HyperparameterPrinter hyp_printer;
         vector<pair<string, WatchingVar>> watching_var;
