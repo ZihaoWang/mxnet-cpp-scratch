@@ -63,5 +63,23 @@ void load_model(Executor *exec, const string &path)
     }
 }
 
+void print_sym_info(const map<string, vector<mx_uint>> x_info, const Symbol &sym)
+{
+    vector<vector<mx_uint>> arg_shapes, aux_shapes, out_shapes;
+    sym.InferShape(x_info, &arg_shapes, &aux_shapes, &out_shapes);
+    auto args = sym.ListArguments();
+    auto auxs = sym.ListAuxiliaryStates();
+    auto outputs = sym.ListOutputs();
+    
+    cout << "argument information:" << (arg_shapes.empty() ? " null" : "") << endl;
+    for (size_t i = 0; i < arg_shapes.size(); ++i)
+        cout << "    arg" << i + 1 << ": " << args[i] << ", shape = (" << arg_shapes[i] << ")" << endl;
+    cout << "auxiliary state information:" << (aux_shapes.empty() ? " null" : "") << endl;
+    for (size_t i = 0; i < aux_shapes.size(); ++i)
+        cout << "    aux" << i + 1 << ": " << auxs[i] << ", shape = (" << aux_shapes[i] << ")" << endl;
+    cout << "output information:" << (out_shapes.empty() ? " null" : "") << endl;
+    for (size_t i = 0; i < out_shapes.size(); ++i)
+        cout << "    out" << i + 1 << ": " << outputs[i] << ", shape = (" << out_shapes[i] << ")" << endl;
+}
 
 } // namespace zh
