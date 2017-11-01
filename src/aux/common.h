@@ -114,7 +114,7 @@ template <typename T, typename ... Args>
 unique_ptr<T> make_unique(Args &&... args){ return unique_ptr<T>(new T(std::forward<Args>(args)...)); }
 
 /*
- * functions for printing vectors
+ * functions for printing std::vector
  */
 
 const size_t CONTAINER_MAX_PRINT_TIME = 100;

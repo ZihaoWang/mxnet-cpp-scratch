@@ -3,6 +3,15 @@
 namespace zh
 {
 
+vector<mx_uint> shape2vec(Shape shape)
+{
+    vector<mx_uint> vec(shape.ndim(), 0);
+
+    for (size_t i = 0; i < shape.ndim(); ++i)
+        vec[i] = static_cast<mx_uint>(shape[i]);
+    return vec;
+}
+
 void save_model(const Executor &exec, const string &path, const unordered_set<string> except_args)
 {
     map<string, NDArray> args;
@@ -63,10 +72,15 @@ void load_model(Executor *exec, const string &path)
     }
 }
 
-void print_sym_info(const map<string, vector<mx_uint>> x_info, const Symbol &sym)
+void print_sym_info(const Symbol &sym, const string &input_name, Shape input_shape)
 {
-    vector<vector<mx_uint>> arg_shapes, aux_shapes, out_shapes;
-    sym.InferShape(x_info, &arg_shapes, &aux_shapes, &out_shapes);
+    static vector<vector<mx_uint>> arg_shapes, aux_shapes, out_shapes;
+    map<string, vector<mx_uint>> input_info = {{input_name, shape2vec(input_shape)}};
+
+    arg_shapes.clear();
+    aux_shapes.clear();
+    out_shapes.clear();
+    sym.InferShape(input_info, &arg_shapes, &aux_shapes, &out_shapes);
     auto args = sym.ListArguments();
     auto auxs = sym.ListAuxiliaryStates();
     auto outputs = sym.ListOutputs();
@@ -81,5 +95,19 @@ void print_sym_info(const map<string, vector<mx_uint>> x_info, const Symbol &sym
     for (size_t i = 0; i < out_shapes.size(); ++i)
         cout << "    out" << i + 1 << ": " << outputs[i] << ", shape = (" << out_shapes[i] << ")" << endl;
 }
+
+const vector<vector<mx_uint>> &infer_output_shape(const Symbol &sym, const string &input_name, Shape input_shape)
+{
+    static vector<vector<mx_uint>> arg_shapes, aux_shapes, out_shapes;
+    map<string, vector<mx_uint>> input_info = {{input_name, shape2vec(input_shape)}};
+
+    arg_shapes.clear();
+    aux_shapes.clear();
+    out_shapes.clear();
+    sym.InferShape(input_info, &arg_shapes, &aux_shapes, &out_shapes);
+
+    return out_shapes;
+}
+
 
 } // namespace zh

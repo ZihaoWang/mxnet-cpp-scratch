@@ -4,7 +4,12 @@
 #include "logger.h"
 
 using namespace zh;
-const string LENET_ROOT(PROJ_ROOT + "src/lenet/");
+const string CAPSULE_ROOT(PROJ_ROOT + "src/capsule/");
+
+struct Capsule
+{
+
+};
 
 auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>> &arg_shapes, HypContainer &hyp)
 {
@@ -24,7 +29,7 @@ auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>
     map<string, vector<mx_uint>> infer_input = {
         {input_name, {batch_size, static_cast<mx_uint>(hyp.iget("num_channel")), static_cast<mx_uint>(hyp.iget("img_row")), static_cast<mx_uint>(hyp.iget("img_col"))}}
     };
-    layers.push_back(make_sym(input_name));
+    layers.push_back(Symbol(input_name));
     io_shapes.push_back({input_name, Shape(batch_size, hyp.iget("num_channel"), hyp.iget("img_row"), hyp.iget("img_col"))});
 
     for (size_t i = 0; i < dim_conv_rker.size(); ++i)
@@ -33,7 +38,7 @@ auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>
         const string b_name("b_conv" + to_string(i + 1));
         const int num_filter_last = i == 0 ? hyp.iget("num_channel") : num_filter[i - 1];
 
-        layers.push_back(Convolution(layers.back(), make_sym(w_name), make_sym(b_name), Shape(dim_conv_rker[i], dim_conv_cker[i]), num_filter[i])); 
+        layers.push_back(Convolution(layers.back(), Symbol(w_name), Symbol(b_name), Shape(dim_conv_rker[i], dim_conv_cker[i]), num_filter[i])); 
         arg_shapes.push_back({w_name, Shape(num_filter[i], num_filter_last, dim_conv_rker[i], dim_conv_cker[i])});
         arg_shapes.push_back({b_name, Shape(num_filter[i])});
 
@@ -46,24 +51,17 @@ auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>
     layers.back().InferShape(infer_input, &in_shapes, &aux_shapes, &out_shapes);
     int dim_flatten = out_shapes[0][1];
 
-    layers.push_back(FullyConnected(layers.back(), make_sym("w_fc1"), make_sym("b_fc1"), dim_fc[0]));
+    layers.push_back(FullyConnected(layers.back(), Symbol("w_fc1"), Symbol("b_fc1"), dim_fc[0]));
     arg_shapes.push_back({"w_fc1", Shape(dim_fc[0], dim_flatten)});
     arg_shapes.push_back({"b_fc1", Shape(dim_fc[0])});
     layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
-    layers.push_back(FullyConnected(layers.back(), make_sym("w_fc2"), make_sym("b_fc2"), dim_fc[1]));
+    layers.push_back(FullyConnected(layers.back(), Symbol("w_fc2"), Symbol("b_fc2"), dim_fc[1]));
     arg_shapes.push_back({"w_fc2", Shape(dim_fc[1], dim_fc[0])});
     arg_shapes.push_back({"b_fc2", Shape(dim_fc[1])});
 
-    layers.push_back(SoftmaxOutput(layers.back(), make_sym("y")));
+    layers.push_back(SoftmaxOutput(layers.back(), Symbol("y")));
     io_shapes.push_back({"y", Shape(batch_size)});
     return layers.back();
-
-    /*
-    vector<vector<string>> tmp;
-    tmp.push_back(h1.ListArguments());
-    tmp.push_back(h1.ListArguments());
-    cout << tmp << endl;
-    */
 }
 
 auto def_data_iter(HypContainer &hyp)
@@ -202,9 +200,9 @@ void run(Logger &logger, HypContainer &hyp)
 
 int main(int argc, char** argv)
 {
-    //auto logger = make_unique<Logger>(cout, "", "lenet");
-    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "lenet");
-    auto hyp = make_unique<HypContainer>(LENET_ROOT + "lenet.hyp");
+    //auto logger = make_unique<Logger>(cout, "", "capsule");
+    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "capsule");
+    auto hyp = make_unique<HypContainer>(CAPSULE_ROOT + "capsule.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 

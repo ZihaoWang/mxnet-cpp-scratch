@@ -7,37 +7,56 @@ namespace zh
 {
 
 /*
- * convenient mxnet wrappers
+ * convenient wrapper
+ *
+ * convert a Shape into a vector<mx_uint>
  */
-
-inline auto make_sym(const string &name){ return Symbol::Variable(name); }
+vector<mx_uint> shape2vec(Shape shape);
 
 /*
  * save and load whole models
  */
 
-// arg 3:
-// the name of arguments in a network that should not be saved (inputs, target, ...).
+// arg2: path for saving the model
+// arg3: the name of arguments in a network that should not be saved (inputs, target, ...).
 //
 // save_model(exec, "./mlp.model", {"x", "y"})
 void save_model(const Executor &exec, const string &path, const unordered_set<string> except_args = unordered_set<string>());
 
-// load_model(exec, "./mlp.model")
+// arg2: path of model to be loaded
+//
+// Executor exec;
+// ...
+// load_model(&exec, "./mlp.model")
 void load_model(Executor *exec, const string &path);
 
 /*
  * print the information of a symbol by using mxnet's static inference
  * 
- * This function is used for debugging. If you wish to use these information, just directly call the relevant function like InferShape().
+ * This function is used for debugging. If you wish to use these information, just directly call the mxnet function like InferShape() or my wrapper infer_output_shape().
+ * This function is not reenterable.
  */
 
-// arg1: the infomation of input symbol of the whole computation graph: a name-shape pair
-// arg2: the symbol to be inferred
+// arg1: the symbol to be inferred
+// arg2: the name of input symbol of the whole computation graph
+// arg3: the shape of input symbol of the whole computation graph
 //
-// x = make_sym("x");
+// string input_name("x");
+// Shape input_shape(10, 4);
+// auto x = Symbol(input_name);
 // auto pred = FullyConnected(x, ...);
-// infer_shape({"x", {10, 4}}, pred);
-void print_sym_info(const map<string, vector<mx_uint>> x_info, const Symbol &sym);
+// const auto &output_shape = infer_output_shape(pred, input_name, input_shape);
+void print_sym_info(const Symbol &sym, const string &input_name, Shape input_shape);
+
+/*
+ * convenient wrapper for inferring output shape of a symbol
+ *
+ * This function is not reenterable.
+ */
+
+// the parameter and usage is same as print_sym_info()
+// return: shapes of all outputs of sym
+const vector<vector<mx_uint>> &infer_output_shape(const Symbol &sym, const string &input_name, Shape input_shape);
 
 } // namespace zh
 
