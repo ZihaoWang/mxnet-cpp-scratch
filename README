@@ -5,7 +5,7 @@ Requirements:
 
 The structure of project:
     src/aux/*: some tools for this project.
-Other directories under src/ consists of different models. In these directories, *.hyp file contains hyperparameters of model, and the main.cpp contains main framework of the model. Besides, other source files may exists if model is too complex to be written in main.cpp.
+Other directories under src/ consists of different models. In these directories, *.hyp file contains hyperparameters of model, and the main.cpp contains main framework of the model. Besides, other source files may exist if the model is too complex to be written in main.cpp.
 
 How to compile and run each model (we use src/mlp/ as a example):
 1. cd src/mlp
@@ -31,6 +31,6 @@ If someone want to learn how to use mxnet with C++, the following sequence may h
     What's new:
         (1). define and combine multiple loss function.
         (2). pass value other than loss out from symbolic computational graph.
-        (3). maintain an individual state beside the computational graph (this state participates in forward pass of computational graph, but not updated through gradient as usual).
+        (3). maintain an individual state beside the computational graph (such a state participates in forward pass of computational graph, but it is not updated through gradient as usual).
 
 4. src/char_rnn/*: to do
