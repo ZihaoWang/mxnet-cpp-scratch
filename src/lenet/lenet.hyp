@@ -2,7 +2,7 @@
 [bool]
 using_gpu true
 [int]
-idx_gpu 0
+idx_gpu 1
 
 // loading model related hyperparameters
 [bool]
@@ -33,5 +33,5 @@ dim_pool_rstrd 2 2 1
 dim_pool_cstrd 2 2 1
 dim_fc 500 10
 [float]
-learning_rate 0.0001
-weight_decay 0.0001
+learning_rate 1.0
+weight_decay 1e-3

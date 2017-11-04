@@ -21,51 +21,67 @@ auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>
     vector<Symbol> layers;
 
     const string input_name("x");
-    const Shape input_shape(batch_size, hyp.iget("num_channel"), hyp.iget("img_row"), hyp.iget("img_col"));
-    map<string, vector<mx_uint>> infer_input = {
-        {"x", {batch_size, static_cast<mx_uint>(hyp.iget("num_channel")), static_cast<mx_uint>(hyp.iget("img_row")), static_cast<mx_uint>(hyp.iget("img_col"))}}
+    vector<mx_uint> input_shape = {
+        batch_size,
+        static_cast<mx_uint>(hyp.iget("num_channel")),
+        static_cast<mx_uint>(hyp.iget("img_row")),
+        static_cast<mx_uint>(hyp.iget("img_col"))
     };
+    map<string, vector<mx_uint>> input_info = {{"x", input_shape}};
     layers.push_back(Symbol(input_name));
-    io_shapes.push_back({input_name, input_shape});
+    io_shapes.push_back({input_name, Shape(input_shape)});
 
+    // convolution-tanh-pooling layers
     for (size_t i = 0; i < dim_conv_rker.size(); ++i)
     {
         const string w_name("w_conv" + to_string(i + 1));
         const string b_name("b_conv" + to_string(i + 1));
         const int num_filter_last = i == 0 ? hyp.iget("num_channel") : num_filter[i - 1];
 
-        layers.push_back(Convolution(layers.back(), Symbol(w_name), Symbol(b_name), Shape(dim_conv_rker[i], dim_conv_cker[i]), num_filter[i])); 
+        layers.push_back(Convolution(layers.back(),
+                    Symbol(w_name),
+                    Symbol(b_name),
+                    Shape(dim_conv_rker[i], dim_conv_cker[i]),
+                    num_filter[i])); 
         arg_shapes.push_back({w_name, Shape(num_filter[i], num_filter_last, dim_conv_rker[i], dim_conv_cker[i])});
         arg_shapes.push_back({b_name, Shape(num_filter[i])});
 
         layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
-        layers.push_back(Pooling(layers.back(), Shape(dim_pool_rker[i], dim_pool_cker[i]), PoolingPoolType::kMax, false, false, PoolingPoolingConvention::kValid, Shape(dim_pool_rstrd[i], dim_pool_cstrd[i])));
+
+        layers.push_back(Pooling(layers.back(),
+                    Shape(dim_pool_rker[i], dim_pool_cker[i]),
+                    PoolingPoolType::kMax,
+                    false,
+                    false,
+                    PoolingPoolingConvention::kValid,
+                    Shape(dim_pool_rstrd[i], dim_pool_cstrd[i])));
     }
 
     layers.push_back(Flatten(layers.back()));
-    const auto &out_shapes = infer_output_shape(layers.back(), input_name, input_shape);
-    //vector<vector<mx_uint>> in_shapes, aux_shapes, out_shapes;
-    //layers.back().InferShape(infer_input, &in_shapes, &aux_shapes, &out_shapes);
+    const auto &out_shapes = infer_output_shape(layers.back(), input_info);
     int dim_flatten = out_shapes[0][1];
 
-    layers.push_back(FullyConnected(layers.back(), Symbol("w_fc1"), Symbol("b_fc1"), dim_fc[0]));
+    // fully-connected layers
+    layers.push_back(FullyConnected(layers.back(),
+                Symbol("w_fc1"),
+                Symbol("b_fc1"),
+                dim_fc[0]));
     arg_shapes.push_back({"w_fc1", Shape(dim_fc[0], dim_flatten)});
     arg_shapes.push_back({"b_fc1", Shape(dim_fc[0])});
     layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
-    layers.push_back(FullyConnected(layers.back(), Symbol("w_fc2"), Symbol("b_fc2"), dim_fc[1]));
+
+    layers.push_back(FullyConnected(layers.back(),
+                Symbol("w_fc2"),
+                Symbol("b_fc2"),
+                dim_fc[1]));
     arg_shapes.push_back({"w_fc2", Shape(dim_fc[1], dim_fc[0])});
     arg_shapes.push_back({"b_fc2", Shape(dim_fc[1])});
 
+    // softmax loss
     layers.push_back(SoftmaxOutput(layers.back(), Symbol("y")));
     io_shapes.push_back({"y", Shape(batch_size)});
-    return layers.back();
 
-    /*
-    vector<vector<string>> tmp;
-    tmp.push_back(h1.ListArguments());
-    tmp.push_back(h1.ListArguments());
-    cout << tmp << endl;
-    */
+    return layers.back();
 }
 
 auto def_data_iter(HypContainer &hyp)
@@ -87,7 +103,14 @@ auto def_data_iter(HypContainer &hyp)
     return make_pair(train_iter, test_iter);
 }
 
-void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>> &arg_shapes, HypContainer &hyp)
+void init_args(map<string, NDArray> &args,
+        map<string, NDArray> &grads,
+        map<string, OpReqType> &grad_types,
+        map<string, NDArray> &aux_states,
+        const Context &ctx,
+        vector<pair<string, Shape>> &io_shapes,
+        vector<pair<string, Shape>> &arg_shapes,
+        HypContainer &hyp)
 {
     for (auto &duo : io_shapes)
     {
@@ -117,7 +140,7 @@ void get_batch_data(const unique_ptr<Executor> &exec, DataIter *iter)
     const auto batch = iter->GetDataBatch();
     auto arg_dict = exec->arg_dict();
 
-    arg_dict["x"].SyncCopyFromCPU(batch.data.Reshape(Shape(0, 1, 0, 0)).GetData(), batch.data.Size());
+    arg_dict["x"].SyncCopyFromCPU(batch.data.GetData(), batch.data.Size());
     arg_dict["x"].WaitToRead();
     arg_dict["y"].SyncCopyFromCPU(batch.label.GetData(), batch.label.Size());
     arg_dict["y"].WaitToRead();

@@ -2,66 +2,54 @@
 #include "hyp_container.h"
 #include "utils.h"
 #include "logger.h"
+#include "capsule.h"
 
 using namespace zh;
 const string CAPSULE_ROOT(PROJ_ROOT + "src/capsule/");
 
-struct Capsule
+auto def_core(vector<pair<string, Shape>> &io_shapes,
+        vector<pair<string, Shape>> &arg_shapes,
+        vector<pair<string, Shape>> &aux_arg_shapes,
+        HypContainer &hyp)
 {
-
-};
-
-auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>> &arg_shapes, HypContainer &hyp)
-{
-    const unsigned int &batch_size = hyp.iget("batch_size");
-    const auto &dim_conv_rker = hyp.viget("dim_conv_rker");
-    const auto &dim_conv_cker = hyp.viget("dim_conv_cker");
-    const auto &num_filter = hyp.viget("num_filter");
-    const auto &dim_pool_rker = hyp.viget("dim_pool_rker");
-    const auto &dim_pool_cker = hyp.viget("dim_pool_cker");
-    const auto &dim_pool_rstrd = hyp.viget("dim_pool_rstrd");
-    const auto &dim_pool_cstrd = hyp.viget("dim_pool_cstrd");
-    const auto &dim_fc = hyp.viget("dim_fc");
-
+    const int &batch_size = hyp.iget("batch_size");
+    CapsuleConv cap(hyp);
     vector<Symbol> layers;
 
     const string input_name("x");
-    map<string, vector<mx_uint>> infer_input = {
-        {input_name, {batch_size, static_cast<mx_uint>(hyp.iget("num_channel")), static_cast<mx_uint>(hyp.iget("img_row")), static_cast<mx_uint>(hyp.iget("img_col"))}}
+    vector<mx_uint> input_shape = {
+        static_cast<mx_uint>(batch_size),
+        static_cast<mx_uint>(hyp.iget("num_channel")),
+        static_cast<mx_uint>(hyp.iget("img_row")),
+        static_cast<mx_uint>(hyp.iget("img_col"))
     };
-    layers.push_back(Symbol(input_name));
-    io_shapes.push_back({input_name, Shape(batch_size, hyp.iget("num_channel"), hyp.iget("img_row"), hyp.iget("img_col"))});
+    map<string, vector<mx_uint>> input_info = {{"x", input_shape}};
+    Symbol x(input_name);
+    layers.push_back(x);
+    io_shapes.push_back({input_name, Shape(input_shape)});
 
-    for (size_t i = 0; i < dim_conv_rker.size(); ++i)
-    {
-        const string w_name("w_conv" + to_string(i + 1));
-        const string b_name("b_conv" + to_string(i + 1));
-        const int num_filter_last = i == 0 ? hyp.iget("num_channel") : num_filter[i - 1];
+    layers.push_back(cap.conv1_layer(layers.back(), arg_shapes));
 
-        layers.push_back(Convolution(layers.back(), Symbol(w_name), Symbol(b_name), Shape(dim_conv_rker[i], dim_conv_cker[i]), num_filter[i])); 
-        arg_shapes.push_back({w_name, Shape(num_filter[i], num_filter_last, dim_conv_rker[i], dim_conv_cker[i])});
-        arg_shapes.push_back({b_name, Shape(num_filter[i])});
+    layers.push_back(cap.primary_caps_layer(layers.back(), arg_shapes));
 
-        layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
-        layers.push_back(Pooling(layers.back(), Shape(dim_pool_rker[i], dim_pool_cker[i]), PoolingPoolType::kMax, false, false, PoolingPoolingConvention::kValid, Shape(dim_pool_rstrd[i], dim_pool_cstrd[i])));
-    }
+    const string b_ij_name("b_ij");
+    Symbol b_ij(b_ij_name); // zeros(Shape(1152, 10));
+    const auto &out_shapes = infer_output_shape(layers.back(), input_info);
+    int num_capsule = out_shapes[0][1];
+    aux_arg_shapes.push_back({b_ij_name, Shape(num_capsule, hyp.iget("dim_y"))});
 
-    layers.push_back(Flatten(layers.back()));
-    vector<vector<mx_uint>> in_shapes, aux_shapes, out_shapes;
-    layers.back().InferShape(infer_input, &in_shapes, &aux_shapes, &out_shapes);
-    int dim_flatten = out_shapes[0][1];
+    auto duo = cap.digit_caps_layer(layers.back(), b_ij, arg_shapes);
+    auto pred = sqrt(sum(square(duo.first), Shape(1)));
+    layers.push_back(pred);
 
-    layers.push_back(FullyConnected(layers.back(), Symbol("w_fc1"), Symbol("b_fc1"), dim_fc[0]));
-    arg_shapes.push_back({"w_fc1", Shape(dim_fc[0], dim_flatten)});
-    arg_shapes.push_back({"b_fc1", Shape(dim_fc[0])});
-    layers.push_back(Activation(layers.back(), ActivationActType::kTanh));
-    layers.push_back(FullyConnected(layers.back(), Symbol("w_fc2"), Symbol("b_fc2"), dim_fc[1]));
-    arg_shapes.push_back({"w_fc2", Shape(dim_fc[1], dim_fc[0])});
-    arg_shapes.push_back({"b_fc2", Shape(dim_fc[1])});
+    const string label_name("y");
+    Symbol y(label_name);
+    io_shapes.push_back({label_name, Shape(batch_size)});
 
-    layers.push_back(SoftmaxOutput(layers.back(), Symbol("y")));
-    io_shapes.push_back({"y", Shape(batch_size)});
-    return layers.back();
+    Symbol loss1 = cap.margin_loss(pred, y);
+    //Symbol loss = MakeLoss(sum(cap.margin_loss(layers.back(), y)) +
+    //Symbol loss2 = hyp.fget("reconstruct_loss_weight") * cap.reconstruct_loss(layers.back(), x, y, arg_shapes);
+    return Symbol::Group({loss1, BlockGrad(pred), BlockGrad(duo.second)});
 }
 
 auto def_data_iter(HypContainer &hyp)
@@ -83,12 +71,20 @@ auto def_data_iter(HypContainer &hyp)
     return make_pair(train_iter, test_iter);
 }
 
-void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>> &arg_shapes, HypContainer &hyp)
+void init_args(map<string, NDArray> &args,
+        map<string, NDArray> &grads,
+        map<string, OpReqType> &grad_types,
+        map<string, NDArray> &aux_states,
+        const Context &ctx,
+        vector<pair<string, Shape>> &io_shapes,
+        vector<pair<string, Shape>> &arg_shapes,
+        vector<pair<string, Shape>> &aux_arg_shapes,
+        HypContainer &hyp)
 {
     for (auto &duo : io_shapes)
     {
         args.insert({duo.first, NDArray(duo.second, ctx)});
-        grads.insert({duo.first, NDArray()});
+        grads.insert({duo.first, NDArray(duo.second, ctx)});
         grad_types.insert({duo.first, kNullOp});
     }
 
@@ -97,6 +93,13 @@ void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<stri
         args.insert({duo.first, NDArray(duo.second, ctx)});
         grads.insert({duo.first, NDArray(duo.second, ctx)});
         grad_types.insert({duo.first, kWriteTo});
+    }
+
+    for (auto &duo : aux_arg_shapes)
+    {
+        args.insert({duo.first, NDArray(duo.second, ctx)});
+        grads.insert({duo.first, NDArray(duo.second, ctx)});
+        grad_types.insert({duo.first, kNullOp});
     }
 
     auto init = Xavier();
@@ -113,10 +116,8 @@ void get_batch_data(const unique_ptr<Executor> &exec, DataIter *iter)
     const auto batch = iter->GetDataBatch();
     auto arg_dict = exec->arg_dict();
 
-    arg_dict["x"].SyncCopyFromCPU(batch.data.Reshape(Shape(0, 1, 0, 0)).GetData(), batch.data.Size());
-    arg_dict["x"].WaitToRead();
+    arg_dict["x"].SyncCopyFromCPU(batch.data.GetData(), batch.data.Size());
     arg_dict["y"].SyncCopyFromCPU(batch.label.GetData(), batch.label.Size());
-    arg_dict["y"].WaitToRead();
 }
 
 void run(Logger &logger, HypContainer &hyp)
@@ -128,11 +129,12 @@ void run(Logger &logger, HypContainer &hyp)
 
     vector<pair<string, Shape>> io_shapes;
     vector<pair<string, Shape>> arg_shapes;
-    auto core = def_core(io_shapes, arg_shapes, hyp);
+    vector<pair<string, Shape>> aux_arg_shapes;
+    auto core = def_core(io_shapes, arg_shapes, aux_arg_shapes, hyp);
 
     map<string, NDArray> args, grads, aux_states;
     map<string, OpReqType> grad_types;
-    init_args(args, grads, grad_types, aux_states, ctx, io_shapes, arg_shapes, hyp);
+    init_args(args, grads, grad_types, aux_states, ctx, io_shapes, arg_shapes, aux_arg_shapes, hyp);
 
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
     if (hyp.bget("load_existing_model"))
@@ -144,33 +146,48 @@ void run(Logger &logger, HypContainer &hyp)
         load_model(exec.get(), existing_model_path);
     }
 
-    unique_ptr<Optimizer> opt(OptimizerRegistry::Find("adadelta"));
+    unique_ptr<Optimizer> opt(OptimizerRegistry::Find("adam"));
     opt->SetParam("rescale_grad", 1.0 / hyp.iget("batch_size"));
+    opt->SetParam("clip_gradient", 10.0);
 
     int idx_epoch = hyp.iget("existing_epoch") + 1;
-    float train_loss = 0.0;
-    float acc = 0.0;
-    double time_cost = 0.0;
-    logger.add_var("idx_epoch", &idx_epoch)
-        .add_var("train_loss", &train_loss)
-        .add_var("acc", &acc)
-        .add_var("time_cost", &time_cost);
-
-    auto ce_loss = make_unique<LogLoss>();
     auto tic = system_clock::now();
     for (; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
     {
+        logger.make_log("epoch " + to_string(idx_epoch));
         train_iter.Reset();
-        ce_loss->Reset();
-        for (size_t idx_batch = 0; train_iter.Next(); ++idx_batch)
+        float train_loss = 0.0;
+        Accuracy train_acc;
+
+        for (size_t idx_batch = 1; train_iter.Next(); ++idx_batch)
         {
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
+            //cout << "output shape: " << exec->outputs[1].GetShape() << endl;
+            //return;
             exec->Backward();
+            /*
+            for (auto e : exec->arg_arrays)
+                cout << e.GetShape() << endl;
+            return;
+            */
             exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
-            ce_loss->Update(args["y"], exec->outputs[0]);
+
+            exec->outputs[2].CopyTo(&exec->arg_dict()["b_ij"]);
+            //cout << exec->arg_dict()["w_ij"].Slice(0, 1) << endl;
+
+            train_acc.Update(args["y"], exec->outputs[1]);
+            if (idx_batch % hyp.iget("print_freq") == 0)
+            {
+                vector<mx_float> tmp(hyp.iget("batch_size") * 10, 0.0);
+                exec->outputs[0].SyncCopyToCPU(&tmp);
+                for (auto e : tmp)
+                    train_loss += e;
+                logger.make_log("idx_batch = " + to_string(idx_batch) +
+                        ", train_loss = " + to_string(train_loss / idx_batch) +
+                        ", train acc = " + to_string(train_acc.Get()));
+            }
         }
-        train_loss = ce_loss->Get();
 
         if (idx_epoch % hyp.iget("save_freq") == 0)
         {
@@ -181,27 +198,28 @@ void run(Logger &logger, HypContainer &hyp)
             save_model(*exec, saving_model_path, {"x", "y"});
         }
 
-        Accuracy acc_metric;
+        Accuracy test_acc;
         test_iter.Reset();
-        for (size_t idx_batch = 0; test_iter.Next(); ++idx_batch)
+        for (size_t idx_batch = 1; test_iter.Next(); ++idx_batch)
         {
             get_batch_data(exec, &test_iter);
             unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
             exec->Forward(false);
-            acc_metric.Update(args["y"], exec->outputs[0]);
+            test_acc.Update(args["y"], exec->outputs[1]);
         }
 
         auto toc = system_clock::now();
-        time_cost = duration_cast<milliseconds>(toc - tic).count() / 1000.0;
-        acc = acc_metric.Get();
-        logger.log_watching_var();
+        auto time_cost = duration_cast<milliseconds>(toc - tic).count() / 1000.0;
+        logger.make_log("total training loss = " + to_string(train_loss / idx_batch) +
+                ", test acc = " + to_string(test_acc.Get()) +
+                ", time cost = " + to_string(time_cost));
     }
 }
 
 int main(int argc, char** argv)
 {
-    //auto logger = make_unique<Logger>(cout, "", "capsule");
-    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "capsule");
+    auto logger = make_unique<Logger>(cout, "", "capsule");
+    //auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "capsule");
     auto hyp = make_unique<HypContainer>(CAPSULE_ROOT + "capsule.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);

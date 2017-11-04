@@ -38,15 +38,14 @@ void load_model(Executor *exec, const string &path);
  */
 
 // arg1: the symbol to be inferred
-// arg2: the name of input symbol of the whole computation graph
-// arg3: the shape of input symbol of the whole computation graph
+// arg2: the info of input symbol of computation graph (pair<name, shape>)
 //
 // string input_name("x");
 // Shape input_shape(10, 4);
 // auto x = Symbol(input_name);
 // auto pred = FullyConnected(x, ...);
 // const auto &output_shape = infer_output_shape(pred, input_name, input_shape);
-void print_sym_info(const Symbol &sym, const string &input_name, Shape input_shape);
+void print_sym_info(const Symbol &sym, const map<string, vector<mx_uint>> &input_info);
 
 /*
  * convenient wrapper for inferring output shape of a symbol
@@ -56,7 +55,7 @@ void print_sym_info(const Symbol &sym, const string &input_name, Shape input_sha
 
 // the parameter and usage is same as print_sym_info()
 // return: shapes of all outputs of sym
-const vector<vector<mx_uint>> &infer_output_shape(const Symbol &sym, const string &input_name, Shape input_shape);
+const vector<vector<mx_uint>> &infer_output_shape(const Symbol &sym, const map<string, vector<mx_uint>> &input_info);
 
 } // namespace zh
 

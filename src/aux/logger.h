@@ -74,8 +74,6 @@ class Logger
 
         void make_log(const string &msg);
 
-        Logger &make_log(const string &name, const HypVal &var);
-
         void make_log(const HypContainer &hc);
 
         void log_watching_var();

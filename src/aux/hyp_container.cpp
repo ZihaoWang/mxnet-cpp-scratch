@@ -97,39 +97,4 @@ HypContainer::HypContainer(const string &hyp_path)
     }
 }
 
-int &HypContainer::iget(const string &name)
-{
-    return boost::get<int>(hyp.at(name));
-}
-
-float &HypContainer::fget(const string &name)
-{
-    return boost::get<float>(hyp.at(name));
-}
-
-string &HypContainer::sget(const string &name)
-{
-    return boost::get<string>(hyp.at(name));
-}
-
-bool &HypContainer::bget(const string &name)
-{
-    return boost::get<bool>(hyp.at(name));
-}
-
-vector<int> &HypContainer::viget(const string &name)
-{
-    return boost::get<vector<int>>(hyp.at(name));
-}
-
-vector<float> &HypContainer::vfget(const string &name)
-{
-    return boost::get<vector<float>>(hyp.at(name));
-}
-
-vector<string> &HypContainer::vsget(const string &name)
-{
-    return boost::get<vector<string>>(hyp.at(name));
-}
-
 } // namespace zh

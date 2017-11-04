@@ -58,14 +58,6 @@ void Logger::make_log(const string &msg)
     flush_log();
 }
 
-Logger &Logger::make_log(const string &name, const HypVal &var)
-{
-    do_log(name).do_log(" = ");
-    boost::apply_visitor(hyp_printer, var);
-    flush_log();
-    return *this;
-}
-
 void Logger::make_log(const HypContainer &hc)
 {
     for (const auto &duo : hc.hyp)

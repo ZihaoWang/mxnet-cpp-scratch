@@ -72,10 +72,9 @@ void load_model(Executor *exec, const string &path)
     }
 }
 
-void print_sym_info(const Symbol &sym, const string &input_name, Shape input_shape)
+void print_sym_info(const Symbol &sym, const map<string, vector<mx_uint>> &input_info)
 {
     static vector<vector<mx_uint>> arg_shapes, aux_shapes, out_shapes;
-    map<string, vector<mx_uint>> input_info = {{input_name, shape2vec(input_shape)}};
 
     arg_shapes.clear();
     aux_shapes.clear();
@@ -96,10 +95,9 @@ void print_sym_info(const Symbol &sym, const string &input_name, Shape input_sha
         cout << "    out" << i + 1 << ": " << outputs[i] << ", shape = (" << out_shapes[i] << ")" << endl;
 }
 
-const vector<vector<mx_uint>> &infer_output_shape(const Symbol &sym, const string &input_name, Shape input_shape)
+const vector<vector<mx_uint>> &infer_output_shape(const Symbol &sym, const map<string, vector<mx_uint>> &input_info)
 {
     static vector<vector<mx_uint>> arg_shapes, aux_shapes, out_shapes;
-    map<string, vector<mx_uint>> input_info = {{input_name, shape2vec(input_shape)}};
 
     arg_shapes.clear();
     aux_shapes.clear();
@@ -108,6 +106,5 @@ const vector<vector<mx_uint>> &infer_output_shape(const Symbol &sym, const strin
 
     return out_shapes;
 }
-
 
 } // namespace zh

@@ -18,12 +18,6 @@ auto def_core(HypContainer &hyp)
 
     auto s_h1 = sigmoid(broadcast_add(dot(s_x, s_w1), s_b1));
     auto s_h2 = sigmoid(broadcast_add(dot(s_h1, s_w2), s_b2));
-    /*
-    vector<vector<string>> tmp;
-    tmp.push_back(s_h1.ListArguments());
-    tmp.push_back(s_h1.ListArguments());
-    cout << tmp << endl;
-    */
     auto output = SoftmaxOutput(s_h2, s_y);
     return output;
 }
@@ -47,7 +41,12 @@ auto def_data_iter(HypContainer &hyp)
     return make_pair(train_iter, test_iter);
 }
 
-void init_args(map<string, NDArray> &args, map<string, NDArray> &grads, map<string, OpReqType> &grad_types, map<string, NDArray> &aux_states, const Context &ctx, HypContainer &hyp)
+void init_args(map<string, NDArray> &args,
+        map<string, NDArray> &grads,
+        map<string, OpReqType> &grad_types,
+        map<string, NDArray> &aux_states,
+        const Context &ctx,
+        HypContainer &hyp)
 {
     const int dim_x = hyp.iget("img_row") * hyp.iget("img_col");
     const int batch_size = hyp.iget("batch_size");

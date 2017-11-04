@@ -2,7 +2,7 @@
 [bool]
 using_gpu true
 [int]
-idx_gpu 3
+idx_gpu 2
 
 // loading model related hyperparameters
 [bool]
@@ -14,24 +14,35 @@ existing_epoch 0
 [int]
 img_row 28
 img_col 28
+dim_y 10
 max_epoch 100
 save_freq 10
+print_freq 50
 [string]
 data_root /misc/projdata12/info_fil/zhwang/data/image/mnist/mnist_data/
-model_prefix lenet
+model_prefix capsule
 
 // core model hyperparameters
 [int]
-batch_size 100
+batch_size 200
+
 num_channel 1
-dim_conv_rker 5 5 2
-dim_conv_cker 5 5 2
-num_filter 20 50 500
-dim_pool_rker 2 2 2
-dim_pool_cker 2 2 2
-dim_pool_rstrd 2 2 1
-dim_pool_cstrd 2 2 1
-dim_fc 500 10
+dim_conv_rker 9 9
+dim_conv_cker 9 9
+num_filter 256 32
+dim_conv_rstrd 1 2
+dim_conv_cstrd 1 2
+
+dim_capsule 8 16
+num_routing 3
+
+// fully connected layers in the reconstruction regularization
+dim_fc 512 1024 784
+
 [float]
-learning_rate 0.0001
-weight_decay 0.0001
+m_plus 0.9
+m_minus 0.1
+lambda 0.5
+learning_rate 1e-2
+weight_decay 0.0
+reconstruct_loss_weight 5e-4
