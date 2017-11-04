@@ -12,7 +12,7 @@ How to compile and run each model (we use src/mlp/ as a example):
 2. make
 3. ./main
 
-If someone want to learn how to use mxnet with C++, the following sequence may help.
+Below is my steps about learning how to use mxnet with C++.
 1. src/mlp/*: a multi-layer forward NN.
     What's new:
         (1). define a simple NN.
