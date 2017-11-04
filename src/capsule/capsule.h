@@ -97,15 +97,15 @@ class CapsuleConv
             auto loss = T_c * square(clip(m_plus - input, 0, m_plus)) +
                 lambda * (1 - T_c) * square(clip(input - m_minus, 0, 1.0));
 
-            return MakeLoss(loss);
+            return loss;
         }
 
         Symbol reconstruct_loss(Symbol input, Symbol x, Symbol y, vector<pair<string, Shape>> &arg_shapes)
         {
             vector<Symbol> layers;
 
-            y = expand_dims(y, 1);
-            auto idx_pick = tile(y, Shape(1, dim_capsule.back()));
+            auto y_expand = expand_dims(y, 1);
+            auto idx_pick = tile(y_expand, Shape(1, dim_capsule.back()));
 
             layers.push_back(pick(input, idx_pick, dmlc::optional<int>(2))); // activity vector, Shape(batch_size, 16)
 
@@ -135,7 +135,7 @@ class CapsuleConv
 
             // mse loss
             auto loss = square(Reshape(x, Shape(batch_size, -1)) - layers.back());
-            return MakeLoss(loss); // Shape(batch_size, 784)
+            return loss; // Shape(batch_size, 784)
         }
 
     private:

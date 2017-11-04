@@ -32,6 +32,10 @@ dim_pool_cker 2 2 2
 dim_pool_rstrd 2 2 1
 dim_pool_cstrd 2 2 1
 dim_fc 500 10
+
+// optimizer
+[string]
+optimizer adadelta
 [float]
 learning_rate 1.0
 weight_decay 1e-3

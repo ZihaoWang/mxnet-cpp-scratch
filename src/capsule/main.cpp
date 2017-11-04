@@ -7,9 +7,13 @@
 using namespace zh;
 const string CAPSULE_ROOT(PROJ_ROOT + "src/capsule/");
 
+/*
+ * the layer and variable names are the same as what in Hinton's paper "Dynamic Routing Between Capsules"
+ */
+
 auto def_core(vector<pair<string, Shape>> &io_shapes,
         vector<pair<string, Shape>> &arg_shapes,
-        vector<pair<string, Shape>> &aux_arg_shapes,
+        vector<pair<string, Shape>> &state_shapes,
         HypContainer &hyp)
 {
     const int &batch_size = hyp.iget("batch_size");
@@ -23,7 +27,7 @@ auto def_core(vector<pair<string, Shape>> &io_shapes,
         static_cast<mx_uint>(hyp.iget("img_row")),
         static_cast<mx_uint>(hyp.iget("img_col"))
     };
-    map<string, vector<mx_uint>> input_info = {{"x", input_shape}};
+    map<string, vector<mx_uint>> input_info = {{input_name, input_shape}};
     Symbol x(input_name);
     layers.push_back(x);
     io_shapes.push_back({input_name, Shape(input_shape)});
@@ -32,24 +36,31 @@ auto def_core(vector<pair<string, Shape>> &io_shapes,
 
     layers.push_back(cap.primary_caps_layer(layers.back(), arg_shapes));
 
+    // b_ij is an individual state which can't be updated like other arguments by gradient
+    // so we treat is as an output and manually update it after Executor::Forward()
     const string b_ij_name("b_ij");
     Symbol b_ij(b_ij_name); // zeros(Shape(1152, 10));
     const auto &out_shapes = infer_output_shape(layers.back(), input_info);
     int num_capsule = out_shapes[0][1];
-    aux_arg_shapes.push_back({b_ij_name, Shape(num_capsule, hyp.iget("dim_y"))});
+    state_shapes.push_back({b_ij_name, Shape(num_capsule, hyp.iget("dim_y"))});
 
     auto duo = cap.digit_caps_layer(layers.back(), b_ij, arg_shapes);
     auto pred = sqrt(sum(square(duo.first), Shape(1)));
+    auto updated_b_ij = duo.second;
     layers.push_back(pred);
 
     const string label_name("y");
     Symbol y(label_name);
     io_shapes.push_back({label_name, Shape(batch_size)});
 
-    Symbol loss1 = cap.margin_loss(pred, y);
-    //Symbol loss = MakeLoss(sum(cap.margin_loss(layers.back(), y)) +
-    //Symbol loss2 = hyp.fget("reconstruct_loss_weight") * cap.reconstruct_loss(layers.back(), x, y, arg_shapes);
-    return Symbol::Group({loss1, BlockGrad(pred), BlockGrad(duo.second)});
+    auto loss1 = sum(cap.margin_loss(pred, y), Shape(1));
+    auto loss2 = sum(cap.reconstruct_loss(duo.first, x, y, arg_shapes), Shape(1));
+    auto final_loss = loss1 + hyp.fget("reconstruct_loss_weight") * loss2;
+    final_loss = MakeLoss(final_loss);
+
+    // we use Symbol::Group() to output multiple values
+    // pred and updated_b_ij are not loss, so we use BlockGrad() here
+    return Symbol::Group({final_loss, BlockGrad(pred), BlockGrad(updated_b_ij)}); 
 }
 
 auto def_data_iter(HypContainer &hyp)
@@ -78,7 +89,7 @@ void init_args(map<string, NDArray> &args,
         const Context &ctx,
         vector<pair<string, Shape>> &io_shapes,
         vector<pair<string, Shape>> &arg_shapes,
-        vector<pair<string, Shape>> &aux_arg_shapes,
+        vector<pair<string, Shape>> &state_shapes,
         HypContainer &hyp)
 {
     for (auto &duo : io_shapes)
@@ -95,10 +106,11 @@ void init_args(map<string, NDArray> &args,
         grad_types.insert({duo.first, kWriteTo});
     }
 
-    for (auto &duo : aux_arg_shapes)
+    for (auto &duo : state_shapes)
     {
         args.insert({duo.first, NDArray(duo.second, ctx)});
         grads.insert({duo.first, NDArray(duo.second, ctx)});
+        // we do not update states with gradients
         grad_types.insert({duo.first, kNullOp});
     }
 
@@ -129,12 +141,12 @@ void run(Logger &logger, HypContainer &hyp)
 
     vector<pair<string, Shape>> io_shapes;
     vector<pair<string, Shape>> arg_shapes;
-    vector<pair<string, Shape>> aux_arg_shapes;
-    auto core = def_core(io_shapes, arg_shapes, aux_arg_shapes, hyp);
+    vector<pair<string, Shape>> state_shapes; // save individual states
+    auto core = def_core(io_shapes, arg_shapes, state_shapes, hyp);
 
     map<string, NDArray> args, grads, aux_states;
     map<string, OpReqType> grad_types;
-    init_args(args, grads, grad_types, aux_states, ctx, io_shapes, arg_shapes, aux_arg_shapes, hyp);
+    init_args(args, grads, grad_types, aux_states, ctx, io_shapes, arg_shapes, state_shapes, hyp);
 
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
     if (hyp.bget("load_existing_model"))
@@ -146,13 +158,12 @@ void run(Logger &logger, HypContainer &hyp)
         load_model(exec.get(), existing_model_path);
     }
 
-    unique_ptr<Optimizer> opt(OptimizerRegistry::Find("adam"));
+    unique_ptr<Optimizer> opt(OptimizerRegistry::Find(hyp.sget("optimizer")));
     opt->SetParam("rescale_grad", 1.0 / hyp.iget("batch_size"));
     opt->SetParam("clip_gradient", 10.0);
 
-    int idx_epoch = hyp.iget("existing_epoch") + 1;
-    auto tic = system_clock::now();
-    for (; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
+    auto time_start = system_clock::now();
+    for (int idx_epoch = hyp.iget("existing_epoch") + 1; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
     {
         logger.make_log("epoch " + to_string(idx_epoch));
         train_iter.Reset();
@@ -163,18 +174,11 @@ void run(Logger &logger, HypContainer &hyp)
         {
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
-            //cout << "output shape: " << exec->outputs[1].GetShape() << endl;
-            //return;
             exec->Backward();
-            /*
-            for (auto e : exec->arg_arrays)
-                cout << e.GetShape() << endl;
-            return;
-            */
             exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
-
+            // instead of using Executor::UpdateAll() like other arguments
+            // we manually update b_ij by directly copy the updated_b_ij to original b_ij
             exec->outputs[2].CopyTo(&exec->arg_dict()["b_ij"]);
-            //cout << exec->arg_dict()["w_ij"].Slice(0, 1) << endl;
 
             train_acc.Update(args["y"], exec->outputs[1]);
             if (idx_batch % hyp.iget("print_freq") == 0)
@@ -185,7 +189,8 @@ void run(Logger &logger, HypContainer &hyp)
                     train_loss += e;
                 logger.make_log("idx_batch = " + to_string(idx_batch) +
                         ", train_loss = " + to_string(train_loss / idx_batch) +
-                        ", train acc = " + to_string(train_acc.Get()));
+                        ", train acc = " + to_string(train_acc.Get()) +
+                        ", time cost = " + to_string(get_time_interval(time_start)));
             }
         }
 
@@ -207,19 +212,15 @@ void run(Logger &logger, HypContainer &hyp)
             exec->Forward(false);
             test_acc.Update(args["y"], exec->outputs[1]);
         }
-
-        auto toc = system_clock::now();
-        auto time_cost = duration_cast<milliseconds>(toc - tic).count() / 1000.0;
-        logger.make_log("total training loss = " + to_string(train_loss / idx_batch) +
-                ", test acc = " + to_string(test_acc.Get()) +
-                ", time cost = " + to_string(time_cost));
+        logger.make_log("test acc = " + to_string(test_acc.Get()) +
+                ", time cost = " + to_string(get_time_interval(time_start)));
     }
 }
 
 int main(int argc, char** argv)
 {
-    auto logger = make_unique<Logger>(cout, "", "capsule");
-    //auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "capsule");
+    //auto logger = make_unique<Logger>(cout, "", "capsule");
+    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "capsule");
     auto hyp = make_unique<HypContainer>(CAPSULE_ROOT + "capsule.hyp");
     logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);

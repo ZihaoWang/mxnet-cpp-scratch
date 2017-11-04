@@ -61,7 +61,12 @@ void Logger::make_log(const string &msg)
 void Logger::make_log(const HypContainer &hc)
 {
     for (const auto &duo : hc.hyp)
-        make_log(duo.first, duo.second);
+    {
+        string name(duo.first);
+        do_log(name + " = ");
+        boost::apply_visitor(hyp_printer, duo.second);
+        flush_log();
+    }
     flush_log();
 }
 

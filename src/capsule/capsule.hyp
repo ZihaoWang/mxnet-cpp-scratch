@@ -43,6 +43,11 @@ dim_fc 512 1024 784
 m_plus 0.9
 m_minus 0.1
 lambda 0.5
+reconstruct_loss_weight 5e-4
+
+// optimizer
+[string]
+optimizer adam
+[float]
 learning_rate 1e-2
 weight_decay 0.0
-reconstruct_loss_weight 5e-4

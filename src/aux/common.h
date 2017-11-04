@@ -69,8 +69,6 @@ using std::to_string;
 //using std::make_unique;
 using std::exit;
 using std::chrono::system_clock;
-using std::chrono::duration_cast;
-using std::chrono::milliseconds;
 
 const string PROJ_ROOT("/misc/projdata12/info_fil/zhwang/workspace/mxnet_learn/");
 
@@ -155,6 +153,15 @@ ostream &operator<<(ostream &os, const vector<T> &val)
     }
 
     return os;
+}
+
+/*
+ * time interval wrapper
+ */
+auto get_time_interval(std::chrono::time_point<system_clock> &time_start)
+{
+    auto time_end = system_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() / 1000.0;
 }
 
 // boost::variant is adopted to construct heterogeneous containers.

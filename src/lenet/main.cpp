@@ -141,9 +141,7 @@ void get_batch_data(const unique_ptr<Executor> &exec, DataIter *iter)
     auto arg_dict = exec->arg_dict();
 
     arg_dict["x"].SyncCopyFromCPU(batch.data.GetData(), batch.data.Size());
-    arg_dict["x"].WaitToRead();
     arg_dict["y"].SyncCopyFromCPU(batch.label.GetData(), batch.label.Size());
-    arg_dict["y"].WaitToRead();
 }
 
 void run(Logger &logger, HypContainer &hyp)
@@ -171,33 +169,29 @@ void run(Logger &logger, HypContainer &hyp)
         load_model(exec.get(), existing_model_path);
     }
 
-    unique_ptr<Optimizer> opt(OptimizerRegistry::Find("adadelta"));
+    unique_ptr<Optimizer> opt(OptimizerRegistry::Find(hyp.sget("optimizer")));
     opt->SetParam("rescale_grad", 1.0 / hyp.iget("batch_size"));
 
-    int idx_epoch = hyp.iget("existing_epoch") + 1;
-    float train_loss = 0.0;
-    float acc = 0.0;
-    double time_cost = 0.0;
-    logger.add_var("idx_epoch", &idx_epoch)
-        .add_var("train_loss", &train_loss)
-        .add_var("acc", &acc)
-        .add_var("time_cost", &time_cost);
-
-    auto ce_loss = make_unique<LogLoss>();
-    auto tic = system_clock::now();
-    for (; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
+    auto ce_loss = make_unique<LogLoss>(); // compute cross entropy loss for printing
+    auto time_start = system_clock::now();
+    for (int idx_epoch = hyp.iget("existing_epoch") + 1; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
     {
+        logger.make_log("epoch " + to_string(idx_epoch));
         train_iter.Reset();
         ce_loss->Reset();
+        float train_loss = 0.0;
+
         for (size_t idx_batch = 0; train_iter.Next(); ++idx_batch)
         {
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
             exec->Backward();
             exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
-            ce_loss->Update(args["y"], exec->outputs[0]);
+            ce_loss->Update(args["y"], exec->outputs[0]); // exec->outputs[0] is the result of softmax
         }
         train_loss = ce_loss->Get();
+        logger.make_log("training loss = " + to_string(train_loss) +
+                ", time cost = " + to_string(get_time_interval(time_start)));
 
         if (idx_epoch % hyp.iget("save_freq") == 0)
         {
@@ -208,20 +202,18 @@ void run(Logger &logger, HypContainer &hyp)
             save_model(*exec, saving_model_path, {"x", "y"});
         }
 
-        Accuracy acc_metric;
+        Accuracy test_acc;
         test_iter.Reset();
         for (size_t idx_batch = 0; test_iter.Next(); ++idx_batch)
         {
             get_batch_data(exec, &test_iter);
             unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
             exec->Forward(false);
-            acc_metric.Update(args["y"], exec->outputs[0]);
+            test_acc.Update(args["y"], exec->outputs[0]);
         }
 
-        auto toc = system_clock::now();
-        time_cost = duration_cast<milliseconds>(toc - tic).count() / 1000.0;
-        acc = acc_metric.Get();
-        logger.log_watching_var();
+        logger.make_log("test acc = " + to_string(test_acc.Get()) +
+                ", time cost = " + to_string(get_time_interval(time_start)));
     }
 }
 
