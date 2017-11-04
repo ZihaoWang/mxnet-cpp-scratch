@@ -1,3 +1,25 @@
-1. hello_mxnet.cpp
-2. mlp.cpp
-3. lenet.cpp
+Requirements:
+1. a C++11 compiler
+2. Boost 1.53 or above
+3. mxnet 0.10.0
+
+The structure of project:
+    src/aux/*: some tools for this project.
+Other directories under src/ consists of different models. In these directories, *.hyp file contains hyperparameters of model, and the main.cpp contains main framework of the model. Besides, other source files may exists if model is too complex to be written in main.cpp.
+
+How to compile and run each model (we use src/mlp/ as a example):
+1. cd src/mlp
+2. make
+3. ./main
+
+If someone want to learn how to use mxnet with C++, the following sequence may help.
+1. src/mlp/*: a multi-layer forward NN.
+    What's new: how to define a simple NN, load data, initialize parameters, train and test the model, save and load the model.
+
+2. src/lenet/*: the lenet-5 CNN in "Gradient-Based Learning Applied to Document Recognition".
+    What's new: how to use CNN related APIs, how to print loss value after each forward pass.
+
+3. src/capsule/*: the CapsNet in "Dynamic Routing Between Capsules".
+    What's new: how to define and combine multiple loss function, pass value other than loss out from symbolic computational graph, maintain an individual state beside the computational graph (this state participates in forward pass of computational graph, but not updated through gradient as usual).
+
+4. src/char_rnn/*: to do
