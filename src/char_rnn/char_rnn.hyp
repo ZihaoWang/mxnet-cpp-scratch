@@ -1,0 +1,34 @@
+// device
+[bool]
+using_gpu true
+[int]
+idx_gpu 2
+
+// loading model related hyperparameters
+[bool]
+load_existing_model false
+[int]
+existing_epoch 0
+
+// data and framework related hyperparameters
+[int]
+dim_y
+max_epoch 100
+save_freq 10
+print_freq 50
+[string]
+data_root
+model_prefix char_rnn
+
+// core model hyperparameters
+[int]
+batch_size
+
+[float]
+
+// optimizer
+[string]
+optimizer
+[float]
+learning_rate
+weight_decay

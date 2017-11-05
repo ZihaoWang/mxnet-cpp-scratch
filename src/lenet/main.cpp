@@ -4,6 +4,7 @@
 #include "logger.h"
 
 using namespace zh;
+const string PROJ_ROOT("/misc/projdata12/info_fil/zhwang/workspace/mxnet_learn/");
 const string LENET_ROOT(PROJ_ROOT + "src/lenet/");
 
 auto def_core(vector<pair<string, Shape>> &io_shapes, vector<pair<string, Shape>> &arg_shapes, HypContainer &hyp)
@@ -222,7 +223,6 @@ int main(int argc, char** argv)
     auto logger = make_unique<Logger>(cout, "", "lenet");
     //auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "lenet");
     auto hyp = make_unique<HypContainer>(LENET_ROOT + "lenet.hyp");
-    logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 
     run(*logger, *hyp);

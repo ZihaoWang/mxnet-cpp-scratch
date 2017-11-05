@@ -4,7 +4,7 @@
 #include "logger.h"
 
 using namespace zh;
-
+const string PROJ_ROOT("/misc/projdata12/info_fil/zhwang/workspace/mxnet_learn/");
 const string MLP_ROOT(PROJ_ROOT + "src/mlp/");
 
 auto def_core(HypContainer &hyp)
@@ -159,7 +159,6 @@ int main(int argc, char** argv)
     auto logger = make_unique<Logger>(cout, "", "mlp");
     //auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "mlp");
     auto hyp = make_unique<HypContainer>(MLP_ROOT + "mlp.hyp");
-    logger->make_log("Hyperparameters:\n");
     logger->make_log(*hyp);
 
     run(*logger, *hyp);

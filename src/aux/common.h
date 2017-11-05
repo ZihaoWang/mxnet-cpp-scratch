@@ -70,8 +70,6 @@ using std::to_string;
 using std::exit;
 using std::chrono::system_clock;
 
-const string PROJ_ROOT("/misc/projdata12/info_fil/zhwang/workspace/mxnet_learn/");
-
 inline void CRY(const string &msg)
 {
     cerr << "\nAn exception occurs!\n" << endl;
@@ -115,12 +113,12 @@ unique_ptr<T> make_unique(Args &&... args){ return unique_ptr<T>(new T(std::forw
  * functions for printing std::vector
  */
 
-const size_t CONTAINER_MAX_PRINT_TIME = 100;
+const size_t VECTOR_MAX_PRINT_TIME = 100;
 
 template <typename T>
 ostream &operator<<(ostream &os, const vector<vector<T>> &val)
 {
-    if (val.size() <= CONTAINER_MAX_PRINT_TIME)
+    if (val.size() <= VECTOR_MAX_PRINT_TIME)
     {
         for (size_t i = 0; i < val.size() - 1; ++i)
             os << val[i] << endl;
@@ -128,7 +126,7 @@ ostream &operator<<(ostream &os, const vector<vector<T>> &val)
     }
     else
     {
-        for (size_t i = 0; i < CONTAINER_MAX_PRINT_TIME; ++i)
+        for (size_t i = 0; i < VECTOR_MAX_PRINT_TIME; ++i)
             os << val[i] << endl;
         os << "...";
     }
@@ -139,7 +137,7 @@ ostream &operator<<(ostream &os, const vector<vector<T>> &val)
 template <typename T>
 ostream &operator<<(ostream &os, const vector<T> &val)
 {
-    if (val.size() <= CONTAINER_MAX_PRINT_TIME)
+    if (val.size() <= VECTOR_MAX_PRINT_TIME)
     {
         for (size_t i = 0; i < val.size() - 1; ++i)
             os << val[i] << ", ";
@@ -147,7 +145,7 @@ ostream &operator<<(ostream &os, const vector<T> &val)
     }
     else
     {
-        for (size_t i = 0; i < CONTAINER_MAX_PRINT_TIME; ++i)
+        for (size_t i = 0; i < VECTOR_MAX_PRINT_TIME; ++i)
             os << val[i] << ", ";
         os << "...";
     }
@@ -158,7 +156,7 @@ ostream &operator<<(ostream &os, const vector<T> &val)
 /*
  * time interval wrapper
  */
-auto get_time_interval(std::chrono::time_point<system_clock> &time_start)
+inline auto get_time_interval(std::chrono::time_point<system_clock> &time_start)
 {
     auto time_end = system_clock::now();
     return std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count() / 1000.0;

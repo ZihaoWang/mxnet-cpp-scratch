@@ -4,9 +4,7 @@ namespace zh
 {
 
 Logger::Logger(ostream &os, const string &log_dir, const string &log_prefix):
-    console(os),
-    var_printer(console, file.get()),
-    hyp_printer(console, file.get())
+    console(os)
 {
     time_t tt = system_clock::to_time_t(system_clock::now());
     string cur_time(ctime(&tt));
@@ -19,37 +17,21 @@ Logger::Logger(ostream &os, const string &log_dir, const string &log_prefix):
     string log_path(log_dir + log_prefix + "::" + cur_time + ".log");
 
     if (log_dir.empty())
-        make_log("Logger has been initlized, and the log file is not used");
+        make_log("the log file is not created");
     else
     {
         file = make_unique<ofstream>();
         file->open(log_path);
         if (!*file)
             CRY("log file can't be created: " + log_path);
-        make_log("Logger has been initlized, and the log file is at: " + log_path);
+        make_log("the log file is at: " + log_path);
     }
+    hyp_printer.set_stream(&console, file.get());
 }
 
 Logger::~Logger()
 {
     file->close();
-}
-
-Logger &Logger::add_var(const string &name, const WatchingVar &var)
-{
-    watching_var.emplace_back(name, var);
-    return *this;
-}
-
-Logger &Logger::del_var(const string &name)
-{
-    for (auto iter = watching_var.begin(); iter != watching_var.end(); ++iter)
-        if (iter->first == name)
-        {
-            watching_var.erase(iter);
-            break;
-        }
-    return *this;
 }
 
 void Logger::make_log(const string &msg)
@@ -60,23 +42,17 @@ void Logger::make_log(const string &msg)
 
 void Logger::make_log(const HypContainer &hc)
 {
+    auto hyps = make_unique<map<string, HypVal>>();
     for (const auto &duo : hc.hyp)
+        hyps->emplace(duo);
+
+    do_log("\nHyperparameters:\n");
+    for (const auto &duo : *hyps)
     {
         string name(duo.first);
         do_log(name + " = ");
         boost::apply_visitor(hyp_printer, duo.second);
         flush_log();
-    }
-    flush_log();
-}
-
-void Logger::log_watching_var()
-{
-    for (const auto &duo : watching_var)
-    {
-        do_log(duo.first).do_log(" = ");
-        boost::apply_visitor(var_printer, duo.second);
-        do_log("    ");
     }
     flush_log();
 }

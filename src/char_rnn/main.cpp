@@ -2,83 +2,20 @@
 #include "hyp_container.h"
 #include "utils.h"
 #include "logger.h"
-#include "capsule.h"
 
 using namespace zh;
 const string PROJ_ROOT("/misc/projdata12/info_fil/zhwang/workspace/mxnet_learn/");
-const string CAPSULE_ROOT(PROJ_ROOT + "src/capsule/");
-
-/*
- * the layer and variable names are the same as what in Hinton's paper "Dynamic Routing Between Capsules"
- */
+const string CHAR_RNN_ROOT(PROJ_ROOT + "src/char_rnn/");
 
 auto def_core(vector<pair<string, Shape>> &io_shapes,
         vector<pair<string, Shape>> &arg_shapes,
-        vector<pair<string, Shape>> &state_shapes,
         HypContainer &hyp)
 {
-    const int &batch_size = hyp.iget("batch_size");
-    CapsuleConv cap(hyp);
-    vector<Symbol> layers;
-
-    const string input_name("x");
-    vector<mx_uint> input_shape = {
-        static_cast<mx_uint>(batch_size),
-        static_cast<mx_uint>(hyp.iget("num_channel")),
-        static_cast<mx_uint>(hyp.iget("img_row")),
-        static_cast<mx_uint>(hyp.iget("img_col"))
-    };
-    map<string, vector<mx_uint>> input_info = {{input_name, input_shape}};
-    Symbol x(input_name);
-    layers.push_back(x);
-    io_shapes.push_back({input_name, Shape(input_shape)});
-
-    layers.push_back(cap.conv1_layer(layers.back(), arg_shapes));
-
-    layers.push_back(cap.primary_caps_layer(layers.back(), arg_shapes));
-
-    // b_ij is an individual state which can't be updated like other arguments by gradient
-    // so we treat is as an output and manually update it after Executor::Forward()
-    const string b_ij_name("b_ij");
-    Symbol b_ij(b_ij_name); // zeros(Shape(1152, 10));
-    const auto &out_shapes = infer_output_shape(layers.back(), input_info);
-    int num_capsule = out_shapes[0][1];
-    state_shapes.push_back({b_ij_name, Shape(num_capsule, hyp.iget("dim_y"))});
-
-    auto duo = cap.digit_caps_layer(layers.back(), b_ij, arg_shapes);
-    auto pred = sqrt(sum(square(duo.first), Shape(1)));
-    auto updated_b_ij = duo.second;
-    layers.push_back(pred);
-
-    const string label_name("y");
-    Symbol y(label_name);
-    io_shapes.push_back({label_name, Shape(batch_size)});
-
-    auto loss1 = sum(cap.margin_loss(pred, y), Shape(1));
-    auto loss2 = sum(cap.reconstruct_loss(duo.first, x, y, arg_shapes), Shape(1));
-    auto final_loss = loss1 + hyp.fget("reconstruct_loss_weight") * loss2;
-    final_loss = MakeLoss(final_loss);
-
-    // we use Symbol::Group() to output multiple values
-    // pred and updated_b_ij are not loss, so we use BlockGrad() here
-    return Symbol::Group({final_loss, BlockGrad(pred), BlockGrad(updated_b_ij)}); 
 }
 
 auto def_data_iter(HypContainer &hyp)
 {
     const string &data_root = hyp.sget("data_root");
-    auto train_iter = MXDataIter("MNISTIter")
-        .SetParam("image", data_root + "train-images-idx3-ubyte")
-        .SetParam("label", data_root + "train-labels-idx1-ubyte")
-        .SetParam("batch_size", hyp.iget("batch_size"))
-        .SetParam("flat", 0)
-        .CreateDataIter();
-    auto test_iter = MXDataIter("MNISTIter")
-        .SetParam("image", data_root + "t10k-images-idx3-ubyte")
-        .SetParam("label", data_root + "t10k-labels-idx1-ubyte")
-        .SetParam("batch_size", hyp.iget("batch_size"))
-        .SetParam("flat", 0)
-        .CreateDataIter();
 
     return make_pair(train_iter, test_iter);
 }
@@ -90,7 +27,6 @@ void init_args(map<string, NDArray> &args,
         const Context &ctx,
         vector<pair<string, Shape>> &io_shapes,
         vector<pair<string, Shape>> &arg_shapes,
-        vector<pair<string, Shape>> &state_shapes,
         HypContainer &hyp)
 {
     for (auto &duo : io_shapes)
@@ -105,14 +41,6 @@ void init_args(map<string, NDArray> &args,
         args.insert({duo.first, NDArray(duo.second, ctx)});
         grads.insert({duo.first, NDArray(duo.second, ctx)});
         grad_types.insert({duo.first, kWriteTo});
-    }
-
-    for (auto &duo : state_shapes)
-    {
-        args.insert({duo.first, NDArray(duo.second, ctx)});
-        grads.insert({duo.first, NDArray(duo.second, ctx)});
-        // we do not update states with gradients
-        grad_types.insert({duo.first, kNullOp});
     }
 
     auto init = Xavier();
@@ -142,12 +70,11 @@ void run(Logger &logger, HypContainer &hyp)
 
     vector<pair<string, Shape>> io_shapes;
     vector<pair<string, Shape>> arg_shapes;
-    vector<pair<string, Shape>> state_shapes; // save individual states
-    auto core = def_core(io_shapes, arg_shapes, state_shapes, hyp);
+    auto core = def_core(io_shapes, arg_shapes, hyp);
 
     map<string, NDArray> args, grads, aux_states;
     map<string, OpReqType> grad_types;
-    init_args(args, grads, grad_types, aux_states, ctx, io_shapes, arg_shapes, state_shapes, hyp);
+    init_args(args, grads, grad_types, aux_states, ctx, io_shapes, arg_shapes, hyp);
 
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
     if (hyp.bget("load_existing_model"))
@@ -177,9 +104,6 @@ void run(Logger &logger, HypContainer &hyp)
             exec->Forward(true);
             exec->Backward();
             exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
-            // instead of using Executor::UpdateAll() like other arguments
-            // we manually update b_ij by directly copy the updated_b_ij to original b_ij
-            exec->outputs[2].CopyTo(&exec->arg_dict()["b_ij"]);
 
             train_acc.Update(args["y"], exec->outputs[1]);
             if (idx_batch % hyp.iget("print_freq") == 0)
@@ -220,9 +144,9 @@ void run(Logger &logger, HypContainer &hyp)
 
 int main(int argc, char** argv)
 {
-    //auto logger = make_unique<Logger>(cout, "", "capsule");
-    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "capsule");
-    auto hyp = make_unique<HypContainer>(CAPSULE_ROOT + "capsule.hyp");
+    //auto logger = make_unique<Logger>(cout, "", "char_rnn");
+    auto logger = make_unique<Logger>(cout, PROJ_ROOT + "result/", "char_rnn");
+    auto hyp = make_unique<HypContainer>(CHAR_RNN_ROOT + "char_rnn.hyp");
     logger->make_log(*hyp);
 
     run(*logger, *hyp);
