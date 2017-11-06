@@ -7,12 +7,6 @@
 namespace zh
 {
 
-// Such types can be placed in the Logger::watching_var.
-// We use pointers because we want a reference to variables out of logger.
-typedef variant<const int *, const size_t *,
-        const double *, const float *,
-        const string *, const bool *> WatchingVar;
-
 struct HyperparameterPrinter : public boost::static_visitor<>
 {
     HyperparameterPrinter(): os(nullptr), ofs(nullptr) {}
