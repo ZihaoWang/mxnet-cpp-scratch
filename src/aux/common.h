@@ -37,8 +37,6 @@
 //#include <mlpack/core.hpp>
 
 #include "mxnet-cpp/MxNetCpp.h"
-// Allow IDE to parse the types
-//#include "mxnet-cpp/op.h"
 
 using namespace mxnet::cpp;
 using std::size_t;

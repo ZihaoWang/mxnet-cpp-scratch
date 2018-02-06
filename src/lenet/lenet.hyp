@@ -2,7 +2,7 @@
 [bool]
 using_gpu true
 [int]
-idx_gpu 1
+idx_gpu 2
 
 // loading model related hyperparameters
 [bool]

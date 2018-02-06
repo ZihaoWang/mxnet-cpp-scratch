@@ -104,7 +104,9 @@ void run(Logger &logger, HypContainer &hyp)
     init_args(args, grads, grad_types, aux_states, ctx, hyp);
 
     auto core = def_core(hyp);
+    auto arg_names = core.ListArguments(); // topological sorted
     unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
+
     if (hyp.bget("load_existing_model"))
     {
         const string existing_model_path(PROJ_ROOT + "model/" +
@@ -116,6 +118,8 @@ void run(Logger &logger, HypContainer &hyp)
 
     unique_ptr<Optimizer> opt(OptimizerRegistry::Find(hyp.sget("optimizer")));
     opt->SetParam("rescale_grad", 1.0 / hyp.iget("batch_size"));
+    opt->SetParam("lr", hyp.fget("learning_rate"));
+    opt->SetParam("wd", hyp.fget("weight_decay"));
 
     auto time_start = system_clock::now();
     for (int idx_epoch = hyp.iget("existing_epoch") + 1; idx_epoch <= hyp.iget("max_epoch"); ++idx_epoch)
@@ -127,7 +131,12 @@ void run(Logger &logger, HypContainer &hyp)
             get_batch_data(exec, &train_iter);
             exec->Forward(true);
             exec->Backward();
-            exec->UpdateAll(opt.get(), hyp.fget("learning_rate"), hyp.fget("weight_decay"));
+            for (size_t i = 0; i < arg_names.size(); ++i)
+            {
+                if (arg_names[i] == "x" || arg_names[i] == "y")
+                    continue;
+                opt->Update(i, exec->arg_arrays[i], exec->grad_arrays[i]);
+            }
         }
 
         if (idx_epoch % hyp.iget("save_freq") == 0)
@@ -144,7 +153,6 @@ void run(Logger &logger, HypContainer &hyp)
         for (size_t idx_batch = 0; test_iter.Next(); ++idx_batch)
         {
             get_batch_data(exec, &test_iter);
-            unique_ptr<Executor> exec(core.SimpleBind(ctx, args, grads, grad_types, aux_states));
             exec->Forward(false);
             test_acc.Update(args["y"], exec->outputs[0]);
         }

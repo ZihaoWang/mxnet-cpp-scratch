@@ -2,7 +2,7 @@
 [bool]
 using_gpu true
 [int]
-idx_gpu 2
+idx_gpu 1
 
 // loading model related hyperparameters
 [bool]
@@ -15,7 +15,7 @@ existing_epoch 0
 img_row 28
 img_col 28
 dim_y 10
-max_epoch 100
+max_epoch 200
 save_freq 10
 print_freq 50
 [string]
@@ -24,7 +24,7 @@ model_prefix capsule
 
 // core model hyperparameters
 [int]
-batch_size 200
+batch_size 100
 
 num_channel 1
 dim_conv_rker 9 9
@@ -49,5 +49,5 @@ reconstruct_loss_weight 5e-4
 [string]
 optimizer adam
 [float]
-learning_rate 1e-2
+learning_rate 1e-3
 weight_decay 0.0

@@ -66,13 +66,14 @@ class CapsuleConv
         }
 
         // the DigitCaps layer
-        pair<Symbol, Symbol> digit_caps_layer(Symbol input, Symbol b_ij, vector<pair<string, Shape>> &arg_shapes)
+        tuple<Symbol, Symbol> digit_caps_layer(Symbol input, Symbol b_ij, vector<pair<string, Shape>> &arg_shapes)
+        //pair<Symbol, Symbol> digit_caps_layer(Symbol input, Symbol b_ij, vector<pair<string, Shape>> &arg_shapes)
         {
             const string w_ij_name("w_ij");
             Symbol w_ij(w_ij_name); // Shape(8, 16)
             arg_shapes.push_back({w_ij_name, Shape(dim_capsule[0], dim_capsule[1])});
 
-            Symbol v("v");
+            Symbol v("v"), new_b_ij("new_b_ij");
             // routing algorithm
             for (int i = 0; i < num_routing; ++i)
             {
@@ -84,10 +85,10 @@ class CapsuleConv
                 // line 6
                 v = squash(s, 1);
                 // line 7
-                b_ij = b_ij + sum(batch_dot(u_hat, v), Shape(0)); // Shape(1152, 10)
+                new_b_ij = b_ij + sum(batch_dot(u_hat, v), Shape(0)); // Shape(1152, 10)
             }
 
-            return make_pair(v, b_ij);
+            return make_tuple(v, new_b_ij);
         }
 
         // input Shape(batch_size, 16, 10)
@@ -133,7 +134,7 @@ class CapsuleConv
             arg_shapes.push_back({"b_fc3", Shape(dim_fc[2])});
             layers.push_back(Activation(layers.back(), ActivationActType::kSigmoid));
 
-            // mse loss
+            // sum of square loss
             auto loss = square(Reshape(x, Shape(batch_size, -1)) - layers.back());
             return loss; // Shape(batch_size, 784)
         }
